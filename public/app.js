@@ -266,6 +266,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     alert(`💅 ${serviceName}\n👤 ${customerName}\n💰 R${price}\n⏰ ${eventTime}`);
   }
 
+  // Delete Appointments
+  async function deleteAppointment(bookingId) {
+    try {
+      showLoading();
+      const response = await fetch(`/api/bookings?id=${bookingId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to cancel appointment');
+      calendar.refetchEvents();
+      alert('🚫 Appointment cancelled successfully.');
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      hideLoading();
+    }
+  }
   // Format date for datetime-local input
   function formatDateTimeForInput(date) {
     const pad = num => num.toString().padStart(2, '0');

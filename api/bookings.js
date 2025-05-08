@@ -1,3 +1,4 @@
+// File: api/bookings.js (updated)
 import redis from './_redis.js';
 import { nanoid } from 'nanoid';
 
@@ -23,7 +24,7 @@ async function checkBookingConflict(service_id, start_time, end_time) {
     const bookingEnd = new Date(booking.end_time);
     const newStart = new Date(start_time);
     const newEnd = new Date(end_time);
-    
+
     return (
       booking.service_id === service_id &&
       !(newEnd <= bookingStart || newStart >= bookingEnd)
@@ -36,7 +37,7 @@ export default async function handler(req, res) {
     try {
       const { from, to, cellphone } = req.query;
       let all = await fetchAllBookings();
-      
+
       if (from && to) {
         const start = new Date(from), end = new Date(to);
         all = all.filter(b => new Date(b.start_time) >= start && new Date(b.end_time) <= end);
@@ -54,23 +55,18 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       const { customer_name, email, cellphone, service_id, start_time } = req.body;
-      
-      // Validate service exists
+
       const service = await validateService(service_id);
-      
-      // Calculate end time
       const durationMs = Number(service.duration) * 60000;
       const end_time = new Date(new Date(start_time).getTime() + durationMs).toISOString();
-      
-      // Check for booking conflicts
+
       if (await checkBookingConflict(service_id, start_time, end_time)) {
         return res.status(409).json({ error: 'Time slot unavailable' });
       }
-      
-      // Create booking
+
       const id = nanoid();
       const reference = `SM-${nanoid(6).toUpperCase()}`;
-      const booking = { 
+      const booking = {
         id,
         customer_name,
         email,
@@ -82,10 +78,10 @@ export default async function handler(req, res) {
         reference,
         created_at: new Date().toISOString()
       };
-      
+
       await redis.hSet(`booking:${id}`, booking);
       await redis.sAdd('bookings:all', `booking:${id}`);
-      
+
       return res.status(201).json(booking);
     } catch (err) {
       console.error('Error creating booking:', err);
@@ -96,6 +92,25 @@ export default async function handler(req, res) {
     }
   }
 
-  res.setHeader('Allow', 'GET, POST');
+  if (req.method === 'DELETE') {
+    try {
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ error: 'Missing booking ID' });
+
+      const key = `booking:${id}`;
+      const exists = await redis.exists(key);
+      if (!exists) return res.status(404).json({ error: 'Booking not found' });
+
+      await redis.del(key);
+      await redis.sRem('bookings:all', key);
+
+      return res.status(200).json({ message: 'Booking cancelled successfully' });
+    } catch (err) {
+      console.error('Error cancelling booking:', err);
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+
+  res.setHeader('Allow', 'GET, POST, DELETE');
   return res.status(405).json({ error: 'Method Not Allowed' });
 }
