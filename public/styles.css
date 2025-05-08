@@ -471,3 +471,15 @@
     visibility: visible !important;
     display: block !important;
   }
+
+  .btn-danger {
+    background-color: var(--accent);
+    color: var(--white);
+  }
+  
+  .btn-danger:hover {
+    background-color: #c0392b;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+  }
+  
