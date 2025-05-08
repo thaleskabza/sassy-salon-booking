@@ -8,7 +8,6 @@
       "@vercel/kv": "^3.0.0",
       "fullcalendar": "^6.1.17",
       "nanoid": "^5.1.5",
-      "next": "^15.3.1",
       "redis": "^5.0.0"
   },
   "repository": {
