@@ -1,349 +1,291 @@
-/* Apple-inspired design system with enhanced contrast and animations */
+/* dashboard.css */
 :root {
     --system-blue: #0a84ff;
     --system-purple: #5e5ce6;
     --system-pink: #ff375f;
     --system-green: #30d158;
     --system-gray: #8e8e93;
-    --system-gray2: #636366;
-    --system-gray6: #1c1c1e;
-    
     --primary: var(--system-purple);
     --secondary: var(--system-pink);
     --background: #f5f5f7;
     --card-bg: #ffffff;
     --text-primary: #1d1d1f;
-    --text-secondary: var(--system-gray2);
+    --text-secondary: #636366;
     --border-color: rgba(0, 0, 0, 0.1);
     --hover-bg: rgba(0, 0, 0, 0.03);
-  }
-  
-  @media (prefers-color-scheme: dark) {
+}
+
+@media (prefers-color-scheme: dark) {
     :root {
-      --background: #000000;
-      --card-bg: #1c1c1e;
-      --text-primary: #f5f5f7;
-      --text-secondary: #a1a1a6;
-      --border-color: rgba(255, 255, 255, 0.1);
-      --hover-bg: rgba(255, 255, 255, 0.03);
+        --background: #000;
+        --card-bg: #1c1c1e;
+        --text-primary: #f5f5f7;
+        --text-secondary: #a1a1a6;
+        --border-color: rgba(255, 255, 255, 0.1);
+        --hover-bg: rgba(255, 255, 255, 0.03);
     }
-  }
-  
-  /* Base Styles with enhanced focus states */
-  body {
+}
+
+body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, sans-serif;
-    background-color: var(--background);
+    background: var(--background);
     color: var(--text-primary);
     margin: 0;
     padding: 20px;
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-  }
-  
-  .container {
+}
+
+.container {
     max-width: 1200px;
     margin: 0 auto;
-    padding-bottom: 40px;
-  }
-  
-  /* Enhanced Typography with better hierarchy */
-  h1, h2, h3 {
+}
+
+.nav-links {
+    margin-bottom: 16px;
+}
+
+.nav-links .dashboard-link {
+    background: var(--primary);
+    color: #fff;
+    padding: 10px 15px;
+    border-radius: 8px;
+    text-decoration: none;
     font-weight: 600;
-    letter-spacing: -0.25px;
-    margin: 0;
-  }
-  
-  .app-title {
-    font-size: 28px;
-    color: var(--text-primary);
-    font-weight: 700;
-  }
-  
-  .app-subtitle {
-    font-size: 16px;
-    color: var(--text-secondary);
-    margin: 4px 0 0;
-    font-weight: 400;
-  }
-  
-  /* Improved Header with subtle animation */
-  .app-header {
+    transition: background-color 0.3s;
+}
+
+.nav-links .dashboard-link:hover {
+    background: #7c3aed;
+}
+
+/* Header */
+.app-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
     padding: 12px 0;
     border-bottom: 1px solid var(--border-color);
-  }
-  
-  .refresh-button {
+    margin-bottom: 24px;
+}
+
+.app-title {
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.app-subtitle {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.refresh-button {
     background: none;
     border: none;
+    cursor: pointer;
     padding: 8px;
     border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  }
-  
-  .refresh-button:hover {
-    background: var(--hover-bg);
+    transition: transform 0.3s;
+}
+
+.refresh-button:hover {
     transform: rotate(90deg);
-  }
-  
-  .refresh-button:active {
-    transform: rotate(270deg);
-  }
-  
-  .refresh-button svg {
-    display: block;
-    width: 20px;
-    height: 20px;
-  }
-  
-  /* Enhanced KPI Cards with better transitions */
-  .kpi-grid {
+}
+
+/* KPI Grid */
+.kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     margin-bottom: 24px;
-  }
-  
-  .kpi-card {
+}
+
+.kpi-card {
     background: var(--card-bg);
     border-radius: 12px;
     padding: 20px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
-  }
-  
-  .kpi-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-  
-  .kpi-card.loading {
+}
+
+.kpi-card.loading {
     min-height: 120px;
-  }
-  
-  .skeleton-loader {
-    background: linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.1) 25%,
-      rgba(255, 255, 255, 0.2) 50%,
-      rgba(255, 255, 255, 0.1) 75%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 8px;
-    height: 100%;
-  }
-  
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-  
-  /* Improved Segmented Control */
-  .segmented-control {
+}
+
+/* Segmented Control */
+.segmented-control {
     display: inline-flex;
     background: var(--card-bg);
     border-radius: 8px;
     padding: 4px;
-    margin-bottom: 24px;
+    margin-bottom: 16px;
     box-shadow: inset 0 0 0 1px var(--border-color);
-  }
-  
-  .segment {
-    padding: 8px 16px;
-    border: none;
+}
+
+.segment {
     background: none;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-secondary);
+    border: none;
+    padding: 8px 16px;
     cursor: pointer;
     border-radius: 6px;
-    transition: all 0.2s ease;
-    position: relative;
-  }
-  
-  .segment.active {
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: background 0.2s;
+}
+
+.segment.active {
     background: var(--primary);
-    color: white;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  }
-  
-  .segment:not(.active):hover {
+    color: #fff;
+}
+
+.segment:not(.active):hover {
     background: var(--hover-bg);
-  }
-  
-  /* Enhanced Cards with better spacing */
-  .dashboard-grid {
+}
+
+/* Custom Date Inputs */
+.custom-date-inputs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+
+.custom-date-inputs.hidden {
+    display: none;
+}
+
+/* Dashboard Grid & Cards */
+.dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
     gap: 20px;
-  }
-  
-  .card {
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+}
+
+.card {
     background: var(--card-bg);
     border-radius: 14px;
     padding: 20px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    transition: all 0.3s ease;
-  }
-  
-  .card:hover {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
-  }
-  
-  .card-header {
+}
+
+.card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 16px;
-  }
-  
-  .card-header h2 {
-    font-size: 20px;
-    color: var(--text-primary);
-  }
-  
-  .card-action {
+}
+
+.card-action {
     background: none;
     border: none;
     color: var(--primary);
     font-weight: 500;
     cursor: pointer;
-    padding: 6px 12px;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-  }
-  
-  .card-action:hover {
-    background: rgba(94, 92, 230, 0.1);
-  }
-  
-  /* Charts with better tooltips */
-  .chart-container {
+}
+
+.card-action:hover {
+    background: var(--hover-bg);
+}
+
+/* Charts */
+.chart-container {
     position: relative;
     height: 300px;
     margin-bottom: 16px;
-  }
-  
-  /* Enhanced Tables with better hover states */
-  .data-table {
+}
+
+/* Tables */
+.data-table {
     overflow-x: auto;
     border-radius: 8px;
     box-shadow: 0 0 0 1px var(--border-color);
-  }
-  
-  table {
+}
+
+table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
-  }
-  
-  th, td {
+}
+
+th,
+td {
     padding: 12px 16px;
-    text-align: left;
     border-bottom: 1px solid var(--border-color);
-  }
-  
-  th {
-    font-weight: 500;
+}
+
+th {
+    background: var(--hover-bg);
     color: var(--text-secondary);
+    font-weight: 500;
+}
+
+tr:hover {
     background: var(--hover-bg);
-  }
-  
-  tr:last-child td {
-    border-bottom: none;
-  }
-  
-  tr:hover {
-    background: var(--hover-bg);
-  }
-  
-  /* Improved Footer with better spacing */
-  .app-footer {
-    margin-top: 40px;
+}
+
+/* Footer */
+.app-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding-top: 20px;
     border-top: 1px solid var(--border-color);
     color: var(--text-secondary);
     font-size: 13px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .footer-links {
-    display: flex;
-    gap: 16px;
-  }
-  
-  .footer-links a {
-    color: inherit;
+    margin-top: 40px;
+}
+
+.footer-links a {
+    margin-left: 16px;
     text-decoration: none;
-    transition: color 0.2s ease;
-  }
-  
-  .footer-links a:hover {
+    color: inherit;
+}
+
+.footer-links a:hover {
     color: var(--primary);
-    text-decoration: underline;
-  }
-  
-  /* Responsive improvements */
-  @media (max-width: 768px) {
-    .kpi-grid {
-      grid-template-columns: 1fr;
+}
+
+/* Skeleton Loader */
+.skeleton-loader {
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.1) 25%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.1) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+    height: 100%;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
     }
-    
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Accessibility & Responsive */
+@media (max-width: 768px) {
+
+    .kpi-grid,
     .dashboard-grid {
-      grid-template-columns: 1fr;
+        grid-template-columns: 1fr;
     }
-    
+
     .app-footer {
-      flex-direction: column;
-      gap: 12px;
-      text-align: center;
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
     }
-  }
-  
-  /* Accessibility improvements */
-  [data-theme="dark"] {
-    color-scheme: dark;
-  }
-  
-  [data-theme="light"] {
-    color-scheme: light;
-  }
-  
-  /* Focus styles for keyboard navigation */
-  :focus-visible {
+}
+
+:focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
-    border-radius: 4px;
-  }
-  
-  /* Reduced motion preferences */
-  @media (prefers-reduced-motion: reduce) {
+}
+
+@media (prefers-reduced-motion: reduce) {
     * {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
     }
-  }
-  .nav-links .dashboard-link {
-    font-weight: 600;
-    color: #fff;
-    background-color: #8b5cf6;
-    padding: 10px 15px;
-    border-radius: 8px;
-    text-decoration: none;
-    transition: background-color 0.3s ease;
-  }
-  
-  .nav-links .dashboard-link:hover {
-    background-color: #7c3aed;
-  }
+}
