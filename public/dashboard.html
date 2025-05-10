@@ -1,78 +1,132 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8" />
-    <title>Sassy Mellanin | Managers Dashboard</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8" />
+  <title>Sassy Mellanin | Manager Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark">
+  
+  <!-- SF Pro via system fonts -->
+  <style>
+    @supports (font: -apple-system-body) {
+      :root { font: -apple-system-body; }
+    }
+  </style>
 
-    <!-- Fonts and Styling Consistency -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap"
-        rel="stylesheet" />
+  <!-- Internal Dashboard Styles -->
+  <link href="dashboard.css" rel="stylesheet" />
 
-    <!-- Internal Dashboard Styles -->
-    <link href="dashboard.css" rel="stylesheet" />
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- 🌟 Booking App Link -->
-    <nav class="nav-links">
-        <a href="index.html" class="dashboard-link">Bookings App</a>
-    </nav>
+  <!-- Chart.js with animation plugins -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
 </head>
-
 <body>
-    <div class="container">
-        <!-- Salon-style Header -->
-        <header class="salon-header">
-            <div class="logo-container">
-                <h1 class="salon-logo">Sassy Mellanin</h1>
-                <p class="salon-tagline">Where Beauty Meets Culture</p>
-            </div>
-            <div class="header-accent"></div>
-        </header>
+  <div class="container">
+    <!-- Minimal Apple-style Header -->
+    <header class="app-header">
+      <div class="header-content">
+        <h1 class="app-title">Sassy Mellanin</h1>
+        <p class="app-subtitle">Manager Dashboard</p>
+      </div>
+      <div class="header-actions">
+        <button class="refresh-button" aria-label="Refresh data">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M23 4v6h-6M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
 
-        <!-- DASHBOARD BODY -->
-        <main class="dashboard-content">
-            <!-- 📊 BOOKINGS BY SERVICE -->
-            <div class="dashboard-section">
-                <h2>📊 Bookings by Service</h2>
-                <canvas id="bookingsChart"></canvas>
-                <div id="bookings-table"></div>
-            </div>
+    <!-- KPI Summary Cards -->
+    <section class="kpi-grid">
+      <div class="kpi-card loading">
+        <div class="skeleton-loader"></div>
+      </div>
+      <div class="kpi-card loading">
+        <div class="skeleton-loader"></div>
+      </div>
+      <div class="kpi-card loading">
+        <div class="skeleton-loader"></div>
+      </div>
+      <div class="kpi-card loading">
+        <div class="skeleton-loader"></div>
+      </div>
+    </section>
 
-            <!-- 💰 REVENUE BY SERVICE -->
-            <div class="dashboard-section">
-                <h2>💰 Revenue by Service</h2>
-                <canvas id="revenueChart"></canvas>
-                <div id="revenue-table"></div>
-            </div>
-
-            <!-- 👑 TOP CLIENTS -->
-            <div class="dashboard-section">
-                <h2>👑 Top Clients</h2>
-                <canvas id="clientsChart"></canvas>
-                <div id="clients-table"></div>
-            </div>
-
-            <!-- 📅 DAILY BOOKINGS -->
-            <div class="dashboard-section">
-                <h2>📅 Bookings per Day</h2>
-                <canvas id="dailyChart"></canvas>
-                <div id="daily-table"></div>
-            </div>
-        </main>
-
-        <footer class="salon-footer">
-            <p>© 2025 Sassy Mellanin. All rights reserved.</p>
-            <p>By Codicis QA</p>
-        </footer>
+    <!-- Time Period Selector -->
+    <div class="segmented-control">
+      <button class="segment active" data-range="today">Today</button>
+      <button class="segment" data-range="week">Week</button>
+      <button class="segment" data-range="month">Month</button>
+      <button class="segment" data-range="custom">Custom</button>
     </div>
 
-    <script src="dashboard.js" defer></script>
-</body>
+    <!-- Dashboard Content -->
+    <main class="dashboard-grid">
+      <!-- Bookings by Service -->
+      <section class="card">
+        <div class="card-header">
+          <h2>Bookings by Service</h2>
+          <button class="card-action">View All</button>
+        </div>
+        <div class="chart-container loading">
+          <canvas id="bookingsChart"></canvas>
+          <div class="skeleton-loader"></div>
+        </div>
+        <div id="bookings-table" class="data-table"></div>
+      </section>
 
+      <!-- Revenue by Service -->
+      <section class="card">
+        <div class="card-header">
+          <h2>Revenue by Service</h2>
+          <button class="card-action">Export</button>
+        </div>
+        <div class="chart-container loading">
+          <canvas id="revenueChart"></canvas>
+          <div class="skeleton-loader"></div>
+        </div>
+        <div id="revenue-table" class="data-table"></div>
+      </section>
+
+      <!-- Top Clients -->
+      <section class="card">
+        <div class="card-header">
+          <h2>Top Clients</h2>
+          <button class="card-action">Manage</button>
+        </div>
+        <div class="chart-container loading">
+          <canvas id="clientsChart"></canvas>
+          <div class="skeleton-loader"></div>
+        </div>
+        <div id="clients-table" class="data-table"></div>
+      </section>
+
+      <!-- Daily Bookings -->
+      <section class="card">
+        <div class="card-header">
+          <h2>Daily Bookings</h2>
+          <button class="card-action">Timeline</button>
+        </div>
+        <div class="chart-container loading">
+          <canvas id="dailyChart"></canvas>
+          <div class="skeleton-loader"></div>
+        </div>
+        <div id="daily-table" class="data-table"></div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>© 2025 Sassy Mellanin. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Support</a>
+      </div>
+    </footer>
+  </div>
+
+  <script src="dashboard.js" defer></script>
+</body>
 </html>
