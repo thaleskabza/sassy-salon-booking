@@ -5,48 +5,65 @@
   <title>Sassy Mellanin | Managers Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- External CSS for styling -->
+  <!-- Fonts and Styling Consistency -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+
+  <!-- Internal Dashboard Styles -->
   <link href="dashboard.css" rel="stylesheet" />
 
-  <!-- Chart.js for visualizations -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <h1>📋 Sassy Mellanin — Managers Dashboard</h1>
+  <div class="container">
+    <!-- Salon-style Header -->
+    <header class="salon-header">
+      <div class="logo-container">
+        <h1 class="salon-logo">Sassy Mellanin</h1>
+        <p class="salon-tagline">Where Beauty Meets Culture</p>
+      </div>
+      <div class="header-accent"></div>
+    </header>
 
-  <!-- 📊 BOOKINGS BY SERVICE -->
-  <div class="dashboard-section">
-    <h2>📊 Bookings by Service</h2>
-    <canvas id="bookingsChart"></canvas>
-    <div id="bookings-table"></div>
+    <!-- DASHBOARD BODY -->
+    <main class="dashboard-content">
+      <!-- 📊 BOOKINGS BY SERVICE -->
+      <div class="dashboard-section">
+        <h2>📊 Bookings by Service</h2>
+        <canvas id="bookingsChart"></canvas>
+        <div id="bookings-table"></div>
+      </div>
+
+      <!-- 💰 REVENUE BY SERVICE -->
+      <div class="dashboard-section">
+        <h2>💰 Revenue by Service</h2>
+        <canvas id="revenueChart"></canvas>
+        <div id="revenue-table"></div>
+      </div>
+
+      <!-- 👑 TOP CLIENTS -->
+      <div class="dashboard-section">
+        <h2>👑 Top Clients</h2>
+        <canvas id="clientsChart"></canvas>
+        <div id="clients-table"></div>
+      </div>
+
+      <!-- 📅 DAILY BOOKINGS -->
+      <div class="dashboard-section">
+        <h2>📅 Bookings per Day</h2>
+        <canvas id="dailyChart"></canvas>
+        <div id="daily-table"></div>
+      </div>
+    </main>
+
+    <footer class="salon-footer">
+      <p>© 2025 Sassy Mellanin. All rights reserved.</p>
+      <p>By Codicis QA</p>
+    </footer>
   </div>
 
-  <!-- 💰 REVENUE BY SERVICE -->
-  <div class="dashboard-section">
-    <h2>💰 Revenue by Service</h2>
-    <canvas id="revenueChart"></canvas>
-    <div id="revenue-table"></div>
-  </div>
-
-  <!-- 👑 TOP CLIENTS -->
-  <div class="dashboard-section">
-    <h2>👑 Top Clients</h2>
-    <canvas id="clientsChart"></canvas>
-    <div id="clients-table"></div>
-  </div>
-
-  <!-- 📅 DAILY BOOKING COUNTS -->
-  <div class="dashboard-section">
-    <h2>📅 Bookings per Day</h2>
-    <canvas id="dailyChart"></canvas>
-    <div id="daily-table"></div>
-  </div>
-
-  <footer>
-    © 2025 Sassy Mellanin | Built by Codicis QA
-  </footer>
-
-  <!-- Custom Dashboard Logic -->
   <script src="dashboard.js" defer></script>
 </body>
 </html>
