@@ -7,6 +7,8 @@
   "scripts": {},
   "dependencies": {
     "@vercel/kv": "^3.0.0",
+    "date-fns": "^4.1.0",
+    "format": "^0.2.2",
     "fullcalendar": "^6.1.17",
     "nanoid": "^5.1.5",
     "redis": "^5.0.0"
