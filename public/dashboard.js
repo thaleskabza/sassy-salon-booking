@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           fetchReport('revenue_by_service', getDateRange()),
           fetchReport('top_clients', getDateRange()),
           fetchReport('daily_counts', getDateRange()),
-          fetchKPIs()
+          fetchKPIs(currentRange)
         ]);
         
         renderCharts({ bookings, revenue, clients, daily });
@@ -89,15 +89,50 @@ document.addEventListener('DOMContentLoaded', async () => {
       return (await res.json()).data;
     }
     
-    async function fetchKPIs() {
-      const res = await fetch('/api/kpis');
+    async function fetchKPIs(range = 'month') {
+      const now = new Date();
+      let from;
+      
+      // Format date as YYYY-MM-DD without date-fns
+      const formatDate = (date) => {
+        const d = new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      switch(range) {
+        case 'today':
+          from = formatDate(new Date(now.setHours(0, 0, 0, 0)));
+          break;
+        case 'week':
+          from = formatDate(new Date(now.setDate(now.getDate() - 7)));
+          break;
+        case 'month':
+          from = formatDate(new Date(now.getFullYear(), now.getMonth(), 1));
+          break;
+        default:
+          from = formatDate(new Date(now.getFullYear(), 0, 1));
+      }
+      
+      const to = formatDate(now);
+      const res = await fetch(`/api/kpis?from=${from}&to=${to}`);
+      
       if (!res.ok) throw new Error('Failed to fetch KPIs');
       return (await res.json()).data;
     }
     
     function renderCharts(data) {
+      // Destroy existing charts if they exist
+      Object.values(charts).forEach(chart => {
+        if (chart.chart) {
+          chart.chart.destroy();
+        }
+      });
+      
       // Bookings Chart
-      new Chart(charts.bookings, {
+      charts.bookings.chart = new Chart(charts.bookings, {
         type: 'bar',
         data: {
           labels: Object.keys(data.bookings),
@@ -112,7 +147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       
       // Revenue Chart
-      new Chart(charts.revenue, {
+      charts.revenue.chart = new Chart(charts.revenue, {
         type: 'pie',
         data: {
           labels: Object.keys(data.revenue),
@@ -132,7 +167,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       
       // Clients Chart
-      new Chart(charts.clients, {
+      charts.clients.chart = new Chart(charts.clients, {
         type: 'bar',
         data: {
           labels: Object.keys(data.clients),
@@ -147,7 +182,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       
       // Daily Bookings Chart
-      new Chart(charts.daily, {
+      charts.daily.chart = new Chart(charts.daily, {
         type: 'line',
         data: {
           labels: Object.keys(data.daily),
@@ -239,19 +274,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderKPIs(data) {
       kpiCards.forEach((card, index) => {
         card.classList.remove('loading');
+        
+        const kpi = data[index];
+        const value = kpi.type === 'text' 
+          ? kpi.displayValue 
+          : formatValue(kpi.value, kpi.type);
+        
         card.innerHTML = `
-          <div class="kpi-label">${data[index].label}</div>
-          <div class="kpi-value">${formatValue(data[index].value, data[index].type)}</div>
-          <div class="kpi-trend ${data[index].trend > 0 ? 'positive' : 'negative'}">
-            ${data[index].trend > 0 ? '↑' : '↓'} ${Math.abs(data[index].trend)}%
+          <div class="kpi-label">${kpi.label}</div>
+          <div class="kpi-value">${value}</div>
+          <div class="kpi-trend ${kpi.trend >= 0 ? 'positive' : 'negative'}">
+            ${kpi.trend >= 0 ? '↑' : '↓'} ${Math.abs(kpi.trend)}%
           </div>
         `;
+        
+        // Add tooltip for top service
+        if (kpi.label === 'Top Service') {
+          card.querySelector('.kpi-value').title = `${kpi.count} bookings`;
+        }
       });
     }
     
     function formatValue(value, type) {
       if (type === 'currency') {
-        return 'R ' + value.toLocaleString('en-ZA', { minimumFractionDigits: 2 });
+        return 'R ' + value.toLocaleString('en-ZA', { 
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
       }
       return value.toLocaleString();
     }
@@ -259,7 +308,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     function showLoadingState() {
       document.querySelectorAll('.chart-container').forEach(container => {
         container.classList.add('loading');
-        container.querySelector('.skeleton-loader').style.height = '300px';
+        if (!container.querySelector('.skeleton-loader')) {
+          const loader = document.createElement('div');
+          loader.className = 'skeleton-loader';
+          loader.style.height = '300px';
+          container.appendChild(loader);
+        }
       });
       
       kpiCards.forEach(card => {
@@ -269,7 +323,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     function showErrorState() {
-      // Would implement proper error UI in production
-      alert('Failed to load data. Please try again.');
+      // Remove loading states
+      document.querySelectorAll('.loading').forEach(el => {
+        el.classList.remove('loading');
+      });
+      
+      // Show error in KPI cards
+      kpiCards.forEach(card => {
+        card.innerHTML = `
+          <div class="kpi-error">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5 3.9"></path>
+              <path d="M12 8v4"></path>
+              <path d="M12 16h.01"></path>
+            </svg>
+            <span>Data unavailable</span>
+          </div>
+        `;
+      });
+      
+      // Add error styles
+      const errorStyle = document.createElement('style');
+      errorStyle.textContent = `
+        .kpi-error {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          color: var(--system-pink);
+          gap: 8px;
+        }
+        .kpi-error svg {
+          stroke: var(--system-pink);
+        }
+      `;
+      document.head.appendChild(errorStyle);
     }
   });
