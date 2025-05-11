@@ -9,34 +9,41 @@ export default async function handler(req, res) {
 
   try {
     const allBookings = await fetchAllBookings();
+
+    // set up our date cutoffs WITHOUT mutating the same Date object
     const now = new Date();
-    const startOfDay = new Date(now.setHours(0, 0, 0, 0));
-    const startOfWeek = new Date(now.setDate(now.getDate() - 7));
+    const startOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek  = new Date(startOfDay);
+    startOfWeek.setDate(startOfDay.getDate() - 7);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Calculate metrics
-    const todayBookings = allBookings.filter(b => 
-      new Date(b.start_time) >= startOfDay
-    );
-    const weekBookings = allBookings.filter(b => 
-      new Date(b.start_time) >= startOfWeek
-    );
-    const monthBookings = allBookings.filter(b => 
-      new Date(b.start_time) >= startOfMonth
-    );
+    // filter bookings into time buckets
+    const todayBookings = allBookings.filter(b => new Date(b.start_time) >= startOfDay);
+    const weekBookings  = allBookings.filter(b => new Date(b.start_time) >= startOfWeek);
+    const monthBookings = allBookings.filter(b => new Date(b.start_time) >= startOfMonth);
 
-    const todayRevenue = todayBookings.reduce(async (sum, booking) => {
-      const service = await redis.hGetAll(`service:${booking.service_id}`);
-      return sum + Number(service.price || 0);
-    }, 0);
+    // helper to sum up booking revenues
+    async function sumRevenue(bookings) {
+      const prices = await Promise.all(
+        bookings.map(async b => {
+          const svc = await redis.hGetAll(`service:${b.service_id}`);
+          return Number(svc.price || 0);
+        })
+      );
+      return prices.reduce((a, b) => a + b, 0);
+    }
 
-    const avgBookingValue = monthBookings.length > 0 
-      ? (await Promise.all(monthBookings.map(async b => {
-          const service = await redis.hGetAll(`service:${b.service_id}`);
-          return Number(service.price || 0);
-        }))).reduce((a, b) => a + b, 0) / monthBookings.length
+    // calculate the core metrics
+    const todayRevenue  = await sumRevenue(todayBookings);
+    const weekRevenue   = await sumRevenue(weekBookings);
+    const monthRevenue  = await sumRevenue(monthBookings);
+
+    // average booking value over the month
+    const avgBookingValue = monthBookings.length
+      ? monthRevenue / monthBookings.length
       : 0;
 
+    // top service for the month
     const topService = await getTopService(monthBookings);
 
     return res.status(200).json({
@@ -47,10 +54,8 @@ export default async function handler(req, res) {
           type: "currency",
           trend: calculateTrend(
             todayRevenue,
-            weekBookings.reduce(async (sum, b) => {
-              const service = await redis.hGetAll(`service:${b.service_id}`);
-              return sum + Number(service.price || 0);
-            }, 0) / 7
+            // compare to average daily revenue over the last week
+            weekRevenue / 7
           )
         },
         {
@@ -59,7 +64,7 @@ export default async function handler(req, res) {
           type: "number",
           trend: calculateTrend(
             weekBookings.length,
-            monthBookings.length / 4
+            monthBookings.length / 4  // roughly compare to “average weekly appointments” in the month
           )
         },
         {
@@ -68,10 +73,9 @@ export default async function handler(req, res) {
           type: "currency",
           trend: calculateTrend(
             avgBookingValue,
-            (await Promise.all(weekBookings.map(async b => {
-              const service = await redis.hGetAll(`service:${b.service_id}`);
-              return Number(service.price || 0);
-            }))).reduce((a, b) => a + b, 0) / weekBookings.length || 0
+            weekBookings.length
+              ? (await sumRevenue(weekBookings)) / weekBookings.length
+              : 0
           )
         },
         {
@@ -95,34 +99,32 @@ async function fetchAllBookings() {
 }
 
 async function getTopService(bookings) {
-  const serviceCounts = {};
-  
-  for (const booking of bookings) {
-    const serviceId = booking.service_id;
-    if (!serviceCounts[serviceId]) serviceCounts[serviceId] = 0;
-    serviceCounts[serviceId]++;
-  }
-  
-  const [topServiceId, count] = Object.entries(serviceCounts)
-    .sort((a, b) => b[1] - a[1])[0] || ['', 0];
-  
-  const service = await redis.hGetAll(`service:${topServiceId}`);
-  
-  // Calculate trend (compare to previous period)
-  const prevPeriodCount = Object.values(serviceCounts).reduce((a, b) => a + b, 0) - count;
-  const trend = prevPeriodCount > 0 
-    ? Math.round(((count - prevPeriodCount) / prevPeriodCount) * 100)
+  const counts = bookings.reduce((acc, b) => {
+    acc[b.service_id] = (acc[b.service_id] || 0) + 1;
+    return acc;
+  }, {});
+
+  const [serviceId, count = 0] = Object.entries(counts)
+    .sort(([,a], [,b]) => b - a)[0] || [];
+
+  const svc = await redis.hGetAll(`service:${serviceId}`);
+
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const prevTotal = total - count;
+  const trend = prevTotal > 0
+    ? Math.round(((count - prevTotal) / prevTotal) * 100)
     : 0;
-  
+
   return {
-    name: service.name || 'Unknown',
+    name: svc.name || 'Unknown',
     count,
     trend
   };
 }
 
 function calculateTrend(current, previous) {
-  return previous > 0 
-    ? Math.round(((current - previous) / previous) * 100)
-    : current > 0 ? 100 : 0;
+  if (previous > 0) {
+    return Math.round(((current - previous) / previous) * 100);
+  }
+  return current > 0 ? 100 : 0;
 }
