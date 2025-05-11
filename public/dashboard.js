@@ -27,32 +27,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Functions
     function initEventListeners() {
-      refreshBtn.addEventListener('click', loadData);
+      refreshBtn.addEventListener('click', handleRefresh);
       
       timeSegments.forEach(segment => {
-        segment.addEventListener('click', () => {
-          timeSegments.forEach(s => s.classList.remove('active'));
-          segment.classList.add('active');
-          currentRange = segment.dataset.range;
-          loadData();
-        });
+        segment.addEventListener('click', () => handleTimeRangeChange(segment));
       });
+    }
+  
+    function handleRefresh() {
+      loadData();
+    }
+  
+    function handleTimeRangeChange(segment) {
+      timeSegments.forEach(s => s.classList.remove('active'));
+      segment.classList.add('active');
+      currentRange = segment.dataset.range;
+      loadData();
     }
     
     async function loadData() {
       try {
         showLoadingState();
         
-        const [bookings, revenue, clients, daily, kpis] = await Promise.all([
-          fetchReport('bookings_by_service', getDateRange()),
-          fetchReport('revenue_by_service', getDateRange()),
-          fetchReport('top_clients', getDateRange()),
-          fetchReport('daily_counts', getDateRange()),
-          fetchKPIs(currentRange)
-        ]);
+        const dateRange = getDateRange();
+        const reports = await fetchAllReports(dateRange);
+        const kpis = await fetchKPIs(currentRange);
         
-        renderCharts({ bookings, revenue, clients, daily });
-        renderTables({ bookings, revenue, clients, daily });
+        renderCharts(reports);
+        renderTables(reports);
         renderKPIs(kpis);
         
       } catch (err) {
@@ -60,10 +62,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         showErrorState();
       }
     }
+  
+    async function fetchAllReports({ from, to }) {
+      const [bookings, revenue, clients, daily] = await Promise.all([
+        fetchReport('bookings_by_service', { from, to }),
+        fetchReport('revenue_by_service', { from, to }),
+        fetchReport('top_clients', { from, to }),
+        fetchReport('daily_counts', { from, to })
+      ]);
+      return { bookings, revenue, clients, daily };
+    }
     
     function getDateRange() {
       const now = new Date();
-      let from, to = now.toISOString();
+      let from;
+      const to = now.toISOString();
       
       switch(currentRange) {
         case 'today':
@@ -76,7 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
           break;
         default:
-          from = new Date(now.getFullYear(), 0, 1).toISOString(); // Year start
+          from = new Date(now.getFullYear(), 0, 1).toISOString();
       }
       
       return { from, to };
@@ -90,70 +103,109 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     async function fetchKPIs(range = 'month') {
-      const now = new Date();
-      let from;
-      
-      // Format date as YYYY-MM-DD without date-fns
-      const formatDate = (date) => {
-        const d = new Date(date);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
-      
-      switch(range) {
-        case 'today':
-          from = formatDate(new Date(now.setHours(0, 0, 0, 0)));
-          break;
-        case 'week':
-          from = formatDate(new Date(now.setDate(now.getDate() - 7)));
-          break;
-        case 'month':
-          from = formatDate(new Date(now.getFullYear(), now.getMonth(), 1));
-          break;
-        default:
-          from = formatDate(new Date(now.getFullYear(), 0, 1));
-      }
-      
-      const to = formatDate(now);
+      const { from, to } = getFormattedDateRange(range);
       const res = await fetch(`/api/kpis?from=${from}&to=${to}`);
-      
       if (!res.ok) throw new Error('Failed to fetch KPIs');
       return (await res.json()).data;
     }
+  
+    function getFormattedDateRange(range) {
+      const now = new Date();
+      let fromDate;
+      
+      switch(range) {
+        case 'today':
+          fromDate = new Date(now.setHours(0, 0, 0, 0));
+          break;
+        case 'week':
+          fromDate = new Date(now.setDate(now.getDate() - 7));
+          break;
+        case 'month':
+          fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        default:
+          fromDate = new Date(now.getFullYear(), 0, 1);
+      }
+      
+      return {
+        from: formatDateForAPI(fromDate),
+        to: formatDateForAPI(now)
+      };
+    }
+  
+    function formatDateForAPI(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
     
     function renderCharts(data) {
-      // Destroy existing charts if they exist
+      destroyExistingCharts();
+      
+      charts.bookings.chart = createBarChart(
+        charts.bookings, 
+        Object.keys(data.bookings), 
+        Object.values(data.bookings),
+        'Bookings by Service',
+        'rgba(94, 92, 230, 0.8)'
+      );
+      
+      charts.revenue.chart = createPieChart(
+        charts.revenue,
+        Object.keys(data.revenue),
+        Object.values(data.revenue),
+        'Revenue Distribution'
+      );
+      
+      charts.clients.chart = createBarChart(
+        charts.clients,
+        Object.keys(data.clients),
+        Object.values(data.clients),
+        'Top Clients',
+        'rgba(255, 55, 95, 0.8)'
+      );
+      
+      charts.daily.chart = createLineChart(
+        charts.daily,
+        Object.keys(data.daily),
+        Object.values(data.daily),
+        'Daily Bookings'
+      );
+    }
+  
+    function destroyExistingCharts() {
       Object.values(charts).forEach(chart => {
         if (chart.chart) {
           chart.chart.destroy();
         }
       });
-      
-      // Bookings Chart
-      charts.bookings.chart = new Chart(charts.bookings, {
+    }
+  
+    function createBarChart(ctx, labels, data, label, backgroundColor) {
+      return new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: Object.keys(data.bookings),
+          labels,
           datasets: [{
-            label: 'Bookings',
-            data: Object.values(data.bookings),
-            backgroundColor: 'rgba(94, 92, 230, 0.8)',
+            label,
+            data,
+            backgroundColor,
             borderRadius: 6
           }]
         },
-        options: getChartOptions('Bookings by Service')
+        options: getChartOptions(label)
       });
-      
-      // Revenue Chart
-      charts.revenue.chart = new Chart(charts.revenue, {
+    }
+  
+    function createPieChart(ctx, labels, data, label) {
+      return new Chart(ctx, {
         type: 'pie',
         data: {
-          labels: Object.keys(data.revenue),
+          labels,
           datasets: [{
-            label: 'Revenue',
-            data: Object.values(data.revenue),
+            label,
+            data,
             backgroundColor: [
               'rgba(94, 92, 230, 0.8)',
               'rgba(255, 55, 95, 0.8)',
@@ -163,32 +215,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             borderWidth: 0
           }]
         },
-        options: getChartOptions('Revenue Distribution')
+        options: getChartOptions(label)
       });
-      
-      // Clients Chart
-      charts.clients.chart = new Chart(charts.clients, {
-        type: 'bar',
-        data: {
-          labels: Object.keys(data.clients),
-          datasets: [{
-            label: 'Visits',
-            data: Object.values(data.clients),
-            backgroundColor: 'rgba(255, 55, 95, 0.8)',
-            borderRadius: 6
-          }]
-        },
-        options: getChartOptions('Top Clients')
-      });
-      
-      // Daily Bookings Chart
-      charts.daily.chart = new Chart(charts.daily, {
+    }
+  
+    function createLineChart(ctx, labels, data, label) {
+      return new Chart(ctx, {
         type: 'line',
         data: {
-          labels: Object.keys(data.daily),
+          labels,
           datasets: [{
-            label: 'Bookings',
-            data: Object.values(data.daily),
+            label,
+            data,
             borderColor: 'rgba(0, 199, 190, 0.8)',
             backgroundColor: 'rgba(0, 199, 190, 0.1)',
             borderWidth: 2,
@@ -196,7 +234,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             fill: true
           }]
         },
-        options: getChartOptions('Daily Bookings', true)
+        options: getChartOptions(label, true)
       });
     }
     
@@ -262,7 +300,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${key}</td>
-          <td>${value.toLocaleString()}</td>
+          <td>${formatTableValue(value)}</td>
         `;
         tbody.appendChild(row);
       });
@@ -270,39 +308,95 @@ document.addEventListener('DOMContentLoaded', async () => {
       table.appendChild(tbody);
       container.appendChild(table);
     }
+  
+    function formatTableValue(value) {
+      return typeof value === 'number' 
+        ? value.toLocaleString() 
+        : value;
+    }
     
     function renderKPIs(data) {
       kpiCards.forEach((card, index) => {
-        card.classList.remove('loading');
+        if (!data[index]) {
+          card.classList.add('error');
+          card.innerHTML = getErrorHTML();
+          return;
+        }
+  
+        card.classList.remove('loading', 'error');
         
         const kpi = data[index];
-        const value = kpi.type === 'text' 
-          ? kpi.displayValue 
-          : formatValue(kpi.value, kpi.type);
-        
+        const { displayValue, tooltip } = getKpiDisplayValues(kpi);
+        const { trendDirection, trendClass, trendValue } = getTrendValues(kpi);
+  
         card.innerHTML = `
           <div class="kpi-label">${kpi.label}</div>
-          <div class="kpi-value">${value}</div>
-          <div class="kpi-trend ${kpi.trend >= 0 ? 'positive' : 'negative'}">
-            ${kpi.trend >= 0 ? '↑' : '↓'} ${Math.abs(kpi.trend)}%
+          <div class="kpi-value" ${tooltip ? `title="${tooltip}"` : ''}>${displayValue}</div>
+          <div class="kpi-trend ${trendClass}">
+            ${trendDirection} ${trendValue}%
           </div>
         `;
-        
-        // Add tooltip for top service
-        if (kpi.label === 'Top Service') {
-          card.querySelector('.kpi-value').title = `${kpi.count} bookings`;
-        }
       });
     }
-    
-    function formatValue(value, type) {
-      if (type === 'currency') {
-        return 'R ' + value.toLocaleString('en-ZA', { 
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        });
+  
+    function getKpiDisplayValues(kpi) {
+      let displayValue;
+      let tooltip = '';
+      
+      switch(kpi.type) {
+        case 'currency':
+          displayValue = formatCurrency(extractNumericValue(kpi.value));
+          break;
+        case 'text':
+          displayValue = kpi.displayValue || extractTextValue(kpi.value);
+          tooltip = kpi.count ? `${kpi.count} bookings` : '';
+          break;
+        default:
+          displayValue = formatNumber(extractNumericValue(kpi.value));
       }
-      return value.toLocaleString();
+      
+      return { displayValue, tooltip };
+    }
+  
+    function getTrendValues(kpi) {
+      const trendValue = Math.abs(kpi.trend || 0);
+      const trendDirection = (kpi.trend || 0) >= 0 ? '↑' : '↓';
+      const trendClass = (kpi.trend || 0) >= 0 ? 'positive' : 'negative';
+      
+      return { trendDirection, trendClass, trendValue };
+    }
+  
+    function extractNumericValue(value) {
+      if (typeof value === 'object' && value !== null) {
+        return value.amount || value.value || value.count || 0;
+      }
+      return Number(value) || 0;
+    }
+  
+    function extractTextValue(value) {
+      if (typeof value === 'object' && value !== null) {
+        return value.name || value.displayValue || '';
+      }
+      return String(value);
+    }
+  
+    function formatCurrency(value) {
+        const numericValue = Number(value);
+        return 'R ' + (
+          isNaN(numericValue)
+            ? '0.00'
+            : numericValue.toLocaleString('en-ZA', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              })
+        );
+      }
+      
+  
+    function formatNumber(value) {
+      const numericValue = Number(value);
+      return isNaN(numericValue) ? '0' : 
+        numericValue.toLocaleString('en-ZA');
     }
     
     function showLoadingState() {
@@ -323,27 +417,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     function showErrorState() {
-      // Remove loading states
       document.querySelectorAll('.loading').forEach(el => {
         el.classList.remove('loading');
       });
       
-      // Show error in KPI cards
       kpiCards.forEach(card => {
-        card.innerHTML = `
-          <div class="kpi-error">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5 3.9"></path>
-              <path d="M12 8v4"></path>
-              <path d="M12 16h.01"></path>
-            </svg>
-            <span>Data unavailable</span>
-          </div>
-        `;
+        card.classList.add('error');
+        card.innerHTML = getErrorHTML();
       });
       
-      // Add error styles
+      addErrorStyles();
+    }
+  
+    function getErrorHTML() {
+      return `
+        <div class="kpi-error">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5 3.9"></path>
+            <path d="M12 8v4"></path>
+            <path d="M12 16h.01"></path>
+          </svg>
+          <span>Data unavailable</span>
+        </div>
+      `;
+    }
+  
+    function addErrorStyles() {
+      const styleId = 'dashboard-error-styles';
+      if (document.getElementById(styleId)) return;
+      
       const errorStyle = document.createElement('style');
+      errorStyle.id = styleId;
       errorStyle.textContent = `
         .kpi-error {
           display: flex;
@@ -356,6 +460,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         .kpi-error svg {
           stroke: var(--system-pink);
+        }
+        .error {
+          background-color: rgba(255, 55, 95, 0.05);
         }
       `;
       document.head.appendChild(errorStyle);
