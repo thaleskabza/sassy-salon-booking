@@ -2,6 +2,12 @@
 // dashboard.js
 import { format } from 'date-fns';
 
+// **** Configure your API host here ****
+const API_BASE = 'http://YOUR_API_IP_OR_HOST:PORT'; // e.g. http://192.168.1.100:3000
+
+document.addEventListener('DOMContentLoaded', async () => {
+import { format } from 'date-fns';
+
 document.addEventListener('DOMContentLoaded', async () => {
   // DOM Elements
   const charts = {
@@ -50,9 +56,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         fetchReport('revenue_by_service',  range),
         fetchReport('top_clients',        range),
         fetchReport('daily_counts',       range),
-        fetchKPIs()
+        fetchKPIs(range)
       ]);
       renderCharts({ bookings, revenue, clients, daily });
+      renderTables({ bookings, revenue, clients, daily });
+      renderKPIs(kpis);
+    } catch (e) {
+      console.error('Dashboard error:', e);
+      showErrorState();
+    }
+  });
       renderTables({ bookings, revenue, clients, daily });
       renderKPIs(kpis);
     } catch (e) {
@@ -86,14 +99,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function fetchReport(metric, { from, to }) {
     const params = new URLSearchParams({ metric, from, to });
+    const url = `${API_BASE}/api/reports?${params}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch ${metric} from ${url}`);
+    return (await res.json()).data;
+  }) {
+    const params = new URLSearchParams({ metric, from, to });
     const res = await fetch(`/api/reports?${params}`);
     if (!res.ok) throw new Error(`Failed to fetch ${metric}`);
     return (await res.json()).data;
   }
 
-  async function fetchKPIs() {
-    const res = await fetch('/api/kpis');
+  async function fetchKPIs({ from, to }) {
+    // Pass date range to KPIs API
+    const params = new URLSearchParams({ from, to });
+    const res = await fetch(`/api/kpis?${params}`);
     if (!res.ok) throw new Error('Failed to fetch KPIs');
+    return (await res.json()).data;
+  } = getDateRange();
+    const params = new URLSearchParams({ from, to });
+    const url = `${API_BASE}/api/kpis?${params}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch KPIs from ${url}`);
     return (await res.json()).data;
   }
 
@@ -164,3 +191,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     alert('Failed to load data.');
   }
 });
+
