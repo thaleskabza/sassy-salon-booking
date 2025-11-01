@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sassy De'Beaute | Commission Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="styles.css" rel="stylesheet" />
+  <style>
+    .commission-toolbar {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .commission-table-wrap {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+      overflow-x: auto;
+    }
+    table.commission-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 820px;
+    }
+    table.commission-table th,
+    table.commission-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    table.commission-table th {
+      background: rgba(139, 95, 191, 0.05);
+      font-weight: 600;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+    .badge-green { background: #e6f9f1; color: #046c4e; }
+    .totals-bar {
+      margin-top: 1.5rem;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .total-card {
+      background: #fff;
+      padding: 1rem 1.25rem;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- header -->
+    <header class="salon-header" style="margin-bottom:2rem;">
+      <div class="logo-container">
+        <h1 class="salon-logo">Sassy De'Beaute</h1>
+        <p class="salon-tagline">Commission Manager</p>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html" class="dashboard-link">Bookings</a>
+        <a href="dashboard.html" class="dashboard-link">Ops Dashboard</a>
+        <a href="commission.html" class="dashboard-link" style="background:#ff375f;">Commission</a>
+      </nav>
+    </header>
+
+    <!-- manager view content -->
+    <section class="calendar-section" style="margin-bottom:2rem;">
+      <h2 class="section-title" style="text-align:left;">Monthly staff commission</h2>
+
+      <div class="commission-toolbar">
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="period-input">Select period</label>
+          <input id="period-input" type="month" />
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="band-view">Commission bands</label>
+          <select id="band-view">
+            <option value="default">Default salon bands</option>
+          </select>
+        </div>
+
+        <button id="refresh-commission" class="btn btn-primary">Refresh</button>
+        <button id="export-commission" class="btn btn-secondary">Export CSV</button>
+      </div>
+
+      <div id="commission-table-container" class="commission-table-wrap">
+        <!-- JS will inject table here -->
+      </div>
+
+      <div class="totals-bar" id="totals-bar">
+        <!-- JS will inject totals -->
+      </div>
+
+    </section>
+
+    <footer class="salon-footer">
+      <p>© 2025 Sassy de'Beaute. All rights reserved.</p>
+      <p>Commission module by Codicis QA</p>
+    </footer>
+  </div>
+
+  <script src="commission.js"></script>
+</body>
+</html>
