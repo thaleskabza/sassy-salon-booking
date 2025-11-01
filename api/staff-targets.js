@@ -5,17 +5,26 @@ import { nanoid } from 'nanoid';
 export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
-      const { staff_id, week_start, sets_completed = 0, target_sets = 10 } = req.body;
-      if (!staff_id || !week_start) {
-        return res.status(400).json({ error: 'staff_id and week_start required' });
-      }
-      const id = `starget-${nanoid(6)}`;
-      const key = `staff-target:${staff_id}:${week_start}`;
+      const {
+        staff_id,
+        employee_id,
+        week_start,
+        sets_completed = 0,
+        target_sets = 10
+      } = req.body;
 
-      // store as hash
+      const finalId = employee_id || staff_id;
+
+      if (!finalId || !week_start) {
+        return res.status(400).json({ error: 'staff_id/employee_id and week_start required' });
+      }
+
+      const id = `starget-${nanoid(6)}`;
+      const key = `staff-target:${finalId}:${week_start}`;
+
       await redis.hSet(key, {
         id,
-        staff_id,
+        staff_id: finalId,
         week_start,
         week_end: getWeekEnd(week_start),
         sets_completed: String(sets_completed),
@@ -23,8 +32,7 @@ export default async function handler(req, res) {
         created_at: new Date().toISOString()
       });
 
-      // index per staff
-      await redis.sAdd(`staff-targets:${staff_id}`, key);
+      await redis.sAdd(`staff-targets:${finalId}`, key);
 
       return res.status(201).json({ message: 'saved' });
     } catch (err) {
@@ -35,11 +43,12 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const { staff_id } = req.query;
-      if (!staff_id) return res.status(400).json({ error: 'staff_id required' });
+      const { staff_id, employee_id } = req.query;
+      const finalId = employee_id || staff_id;
+      if (!finalId) return res.status(400).json({ error: 'staff_id/employee_id required' });
 
-      const keys = await redis.sMembers(`staff-targets:${staff_id}`);
-      const all = await Promise.all(keys.map(k => redis.hGetAll(k)));
+      const keys = await redis.sMembers(`staff-targets:${finalId}`);
+      const all = await Promise.all(keys.map((k) => redis.hGetAll(k)));
 
       return res.status(200).json({ targets: all });
     } catch (err) {
@@ -55,5 +64,5 @@ export default async function handler(req, res) {
 function getWeekEnd(weekStart) {
   const d = new Date(weekStart);
   d.setDate(d.getDate() + 6);
-  return d.toISOString().slice(0,10);
+  return d.toISOString().slice(0, 10);
 }

@@ -1,5 +1,6 @@
 // public/dashboard.js
 document.addEventListener('DOMContentLoaded', async () => {
+  // canvases
   const charts = {
     bookings: document.getElementById('bookingsChart'),
     revenue: document.getElementById('revenueChart'),
@@ -9,6 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     employeeCommission: document.getElementById('employeeCommissionChart')
   };
 
+  // table containers
   const tables = {
     bookings: document.getElementById('bookings-table'),
     revenue: document.getElementById('revenue-table'),
@@ -24,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const executiveSummaryContainer = document.getElementById('executive-summary');
   const execRefreshBtn = document.getElementById('exec-refresh');
 
+  // state
   let currentRange = 'month';
 
   initEvents();
@@ -34,9 +37,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       refreshBtn.addEventListener('click', () => loadData());
     }
 
-    timeSegments.forEach(segment => {
+    timeSegments.forEach((segment) => {
       segment.addEventListener('click', () => {
-        timeSegments.forEach(s => s.classList.remove('active'));
+        timeSegments.forEach((s) => s.classList.remove('active'));
         segment.classList.add('active');
         currentRange = segment.dataset.range;
         loadData();
@@ -64,7 +67,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderTables(reports);
       renderKPIs(kpis);
       renderExecutiveSummary(reports.executive || {});
-
     } catch (err) {
       console.error('Dashboard error:', err);
       showErrorState();
@@ -72,21 +74,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function fetchAllReports({ from, to }) {
+    // 👇 align names with api/reports.js
     const [
       bookings,
       revenue,
       clients,
       daily,
-      bookingsByEmployee,
-      commissionByEmployee,
+      bookingsPerEmployee,
+      commissionPerEmployee,
       executive
     ] = await Promise.all([
       fetchReport('bookings_by_service', { from, to }),
       fetchReport('revenue_by_service', { from, to }),
       fetchReport('top_clients', { from, to }),
       fetchReport('daily_counts', { from, to }),
-      fetchReport('bookings_by_employee', { from, to }),
-      fetchReport('commission_by_employee', { from, to }),
+      fetchReport('bookings_per_employee', { from, to }),
+      fetchReport('commission_per_employee', { from, to }),
       fetchReport('executive_summary', { from, to })
     ]);
 
@@ -95,8 +98,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       revenue: revenue || {},
       clients: clients || {},
       daily: daily || {},
-      bookingsByEmployee: bookingsByEmployee || {},
-      commissionByEmployee: commissionByEmployee || {},
+      bookingsPerEmployee: bookingsPerEmployee || {},
+      commissionPerEmployee: commissionPerEmployee || {},
       executive: executive || {}
     };
   }
@@ -175,6 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderCharts(data) {
     destroyExistingCharts();
 
+    // 1) existing charts
     charts.bookings.chart = createBarChart(
       charts.bookings,
       Object.keys(data.bookings),
@@ -205,29 +209,78 @@ document.addEventListener('DOMContentLoaded', async () => {
       'Daily Bookings'
     );
 
+    // 2) new employee charts
+    const {
+      empLabels,
+      empTotalBookings,
+      empCompletedRevenue
+    } = normaliseEmployeeData(data.bookingsPerEmployee, data.commissionPerEmployee);
+
+    // Bookings per employee (use total bookings)
     charts.employeeBookings.chart = createBarChart(
       charts.employeeBookings,
-      Object.keys(data.bookingsByEmployee),
-      Object.values(data.bookingsByEmployee),
+      empLabels,
+      empTotalBookings,
       'Bookings per Employee',
       'rgba(255, 112, 164, 0.85)'
     );
 
+    // Commission per employee (use computed commission total)
     charts.employeeCommission.chart = createBarChart(
       charts.employeeCommission,
-      Object.keys(data.commissionByEmployee),
-      Object.values(data.commissionByEmployee),
-      'Commission per Employee',
+      empLabels,
+      empCompletedRevenue,
+      'Commission / Revenue per Employee',
       'rgba(216, 180, 114, 0.9)'
     );
   }
 
   function destroyExistingCharts() {
-    Object.values(charts).forEach(chart => {
+    Object.values(charts).forEach((chart) => {
       if (chart && chart.chart) {
         chart.chart.destroy();
       }
     });
+  }
+
+  // turns API objects into chart-able arrays
+  function normaliseEmployeeData(bookingsPerEmployeeObj, commissionPerEmployeeObj) {
+    const empLabels = [];
+    const empTotalBookings = [];
+    const empCompletedRevenue = [];
+
+    // bookingsPerEmployeeObj is like:
+    // {
+    //   "staff-1": { employee_name: "...", total: 5, revenue: 1200, ... }
+    // }
+    const entries = Object.entries(bookingsPerEmployeeObj || {});
+    for (const [id, stats] of entries) {
+      const name = stats.employee_name || id;
+      empLabels.push(name);
+      empTotalBookings.push(Number(stats.total || 0));
+    }
+
+    // commissionPerEmployeeObj is like:
+    // {
+    //   "staff-1": { total_sales: 1000, total_commission: 250, ... }
+    // }
+    // we want to map them in the same order as labels above
+    for (const label of empLabels) {
+      // try to find staff in commission results by name first
+      // BUT: API is keyed by id, not name -> we need to join on id
+      // easiest: fall back to 0 if not found
+      let found = 0;
+      for (const [id, c] of Object.entries(commissionPerEmployeeObj || {})) {
+        const cName = c.employee_name || id;
+        if (cName === label) {
+          found = Number(c.total_commission || c.total_sales || 0);
+          break;
+        }
+      }
+      empCompletedRevenue.push(found);
+    }
+
+    return { empLabels, empTotalBookings, empCompletedRevenue };
   }
 
   function createBarChart(ctx, labels, data, label, backgroundColor) {
@@ -237,12 +290,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       type: 'bar',
       data: {
         labels,
-        datasets: [{
-          label,
-          data,
-          backgroundColor,
-          borderRadius: 6
-        }]
+        datasets: [
+          {
+            label,
+            data,
+            backgroundColor,
+            borderRadius: 6
+          }
+        ]
       },
       options: getChartOptions(label, false, maxVal)
     });
@@ -254,17 +309,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       type: 'pie',
       data: {
         labels,
-        datasets: [{
-          label,
-          data,
-          backgroundColor: [
-            'rgba(247, 100, 159, 0.8)',
-            'rgba(211, 59, 120, 0.8)',
-            'rgba(236, 144, 190, 0.8)',
-            'rgba(216, 180, 114, 0.8)'
-          ],
-          borderWidth: 0
-        }]
+        datasets: [
+          {
+            label,
+            data,
+            backgroundColor: [
+              'rgba(247, 100, 159, 0.8)',
+              'rgba(211, 59, 120, 0.8)',
+              'rgba(236, 144, 190, 0.8)',
+              'rgba(216, 180, 114, 0.8)'
+            ],
+            borderWidth: 0
+          }
+        ]
       },
       options: getChartOptions(label, true)
     });
@@ -277,15 +334,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       type: 'line',
       data: {
         labels,
-        datasets: [{
-          label,
-          data,
-          borderColor: 'rgba(255, 112, 164, 1)',
-          backgroundColor: 'rgba(255, 112, 164, 0.1)',
-          borderWidth: 2,
-          tension: 0.3,
-          fill: true
-        }]
+        datasets: [
+          {
+            label,
+            data,
+            borderColor: 'rgba(255, 112, 164, 1)',
+            backgroundColor: 'rgba(255, 112, 164, 0.1)',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true
+          }
+        ]
       },
       options: getChartOptions(label, true, maxVal)
     });
@@ -334,16 +393,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderTables(data) {
-    renderTable(tables.bookings, data.bookings, ['Service', 'Bookings']);
-    renderTable(tables.revenue, data.revenue, ['Service', 'Revenue (R)']);
-    renderTable(tables.clients, data.clients, ['Client', 'Visits']);
-    renderTable(tables.daily, data.daily, ['Date', 'Bookings']);
+    // existing tables
+    renderSimpleTable(tables.bookings, data.bookings, ['Service', 'Bookings']);
+    renderSimpleTable(tables.revenue, data.revenue, ['Service', 'Revenue (R)']);
+    renderSimpleTable(tables.clients, data.clients, ['Client', 'Visits']);
+    renderSimpleTable(tables.daily, data.daily, ['Date', 'Bookings']);
 
-    renderTable(tables.employeeBookings, data.bookingsByEmployee, ['Employee', 'Bookings']);
-    renderTable(tables.employeeCommission, data.commissionByEmployee, ['Employee', 'Commission (R)']);
+    // employee tables need to render object rows
+    renderEmployeeBookingsTable(tables.employeeBookings, data.bookingsPerEmployee);
+    renderEmployeeCommissionTable(tables.employeeCommission, data.commissionPerEmployee);
   }
 
-  function renderTable(container, data, headers) {
+  function renderSimpleTable(container, data, headers) {
     if (!container) return;
     container.innerHTML = '';
 
@@ -351,7 +412,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
 
-    headers.forEach(h => {
+    headers.forEach((h) => {
       const th = document.createElement('th');
       th.textContent = h;
       headerRow.appendChild(th);
@@ -367,6 +428,76 @@ document.addEventListener('DOMContentLoaded', async () => {
         <td>${formatTableValue(value)}</td>
       `;
       tbody.appendChild(row);
+    });
+
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
+  function renderEmployeeBookingsTable(container, data) {
+    if (!container) return;
+    container.innerHTML = '';
+
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    thead.innerHTML = `
+      <tr>
+        <th>Employee</th>
+        <th>Booked</th>
+        <th>In Session</th>
+        <th>Completed & Paid</th>
+        <th>Total</th>
+        <th>Revenue (R)</th>
+      </tr>
+    `;
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+
+    Object.values(data || {}).forEach((row) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.employee_name || row.employee_id || '—'}</td>
+        <td>${Number(row.booked || 0)}</td>
+        <td>${Number(row.in_session || 0)}</td>
+        <td>${Number(row.completed_paid || 0)}</td>
+        <td>${Number(row.total || 0)}</td>
+        <td>${formatCurrency(Number(row.revenue || 0))}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
+  function renderEmployeeCommissionTable(container, data) {
+    if (!container) return;
+    container.innerHTML = '';
+
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    thead.innerHTML = `
+      <tr>
+        <th>Employee</th>
+        <th>Sale Count</th>
+        <th>Total Sales (R)</th>
+        <th>Total Commission (R)</th>
+      </tr>
+    `;
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+
+    Object.values(data || {}).forEach((row) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.employee_name || row.employee_id || '—'}</td>
+        <td>${Number(row.sale_count || 0)}</td>
+        <td>${formatCurrency(Number(row.total_sales || 0))}</td>
+        <td>${formatCurrency(Number(row.total_commission || 0))}</td>
+      `;
+      tbody.appendChild(tr);
     });
 
     table.appendChild(tbody);
@@ -445,13 +576,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function formatCurrency(value) {
     const numericValue = Number(value);
-    return 'R ' + (
-      isNaN(numericValue)
+    return (
+      'R ' +
+      (isNaN(numericValue)
         ? '0.00'
         : numericValue.toLocaleString('en-ZA', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        })
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          }))
     );
   }
 
@@ -460,32 +592,72 @@ document.addEventListener('DOMContentLoaded', async () => {
     return isNaN(numericValue) ? '0' : numericValue.toLocaleString('en-ZA');
   }
 
+  /**
+   * Executive summary now matches api/reports.js:
+   * {
+   *   period: { from, to },
+   *   total_bookings,
+   *   total_revenue,
+   *   status_breakdown: { booked, in_session, completed_paid },
+   *   top_service: { name, count },
+   *   top_employee: { name, revenue }
+   * }
+   */
   function renderExecutiveSummary(execData) {
     if (!executiveSummaryContainer) return;
 
-    const {
-      total_revenue,
-      total_bookings,
-      total_commission,
-      top_employee,
-      avg_ticket,
-      period
-    } = execData;
+    const periodLabel = execData.period
+      ? `${execData.period.from || ''} → ${execData.period.to || ''}`
+      : 'Current range';
+
+    const status = execData.status_breakdown || {};
+
+    const topEmpName =
+      (execData.top_employee && execData.top_employee.name) || '—';
+    const topEmpRevenue =
+      (execData.top_employee && execData.top_employee.revenue) || 0;
+
+    const topServiceName =
+      (execData.top_service && execData.top_service.name) || '—';
+    const topServiceCount =
+      (execData.top_service && execData.top_service.count) || 0;
 
     executiveSummaryContainer.innerHTML = `
       <ul class="executive-summary-list">
-        <li><span class="exec-label">Period:</span><span class="exec-value">${period || 'Current range'}</span></li>
-        <li><span class="exec-label">Total Revenue:</span><span class="exec-value">${typeof total_revenue !== 'undefined' ? formatCurrency(total_revenue) : '—'}</span></li>
-        <li><span class="exec-label">Total Bookings:</span><span class="exec-value">${typeof total_bookings !== 'undefined' ? formatNumber(total_bookings) : '—'}</span></li>
-        <li><span class="exec-label">Total Commission:</span><span class="exec-value">${typeof total_commission !== 'undefined' ? formatCurrency(total_commission) : '—'}</span></li>
-        <li><span class="exec-label">Top Employee:</span><span class="exec-value">${top_employee || '—'}</span></li>
-        <li><span class="exec-label">Avg Ticket:</span><span class="exec-value">${typeof avg_ticket !== 'undefined' ? formatCurrency(avg_ticket) : '—'}</span></li>
+        <li>
+          <span class="exec-label">Period:</span>
+          <span class="exec-value">${periodLabel}</span>
+        </li>
+        <li>
+          <span class="exec-label">Total Revenue:</span>
+          <span class="exec-value">${formatCurrency(execData.total_revenue || 0)}</span>
+        </li>
+        <li>
+          <span class="exec-label">Total Bookings:</span>
+          <span class="exec-value">${formatNumber(execData.total_bookings || 0)}</span>
+        </li>
+        <li>
+          <span class="exec-label">Booked / In Session / Paid:</span>
+          <span class="exec-value">
+            ${status.booked || 0} / ${status.in_session || 0} / ${status.completed_paid || 0}
+          </span>
+        </li>
+        <li>
+          <span class="exec-label">Top Service:</span>
+          <span class="exec-value">${topServiceName} (${topServiceCount})</span>
+        </li>
+        <li>
+          <span class="exec-label">Top Employee:</span>
+          <span class="exec-value">
+            ${topEmpName} — ${formatCurrency(topEmpRevenue)}
+          </span>
+        </li>
       </ul>
     `;
   }
 
   function showLoadingState() {
-    document.querySelectorAll('.chart-container').forEach(container => {
+    document.querySelectorAll('.chart-container').forEach((container) => {
       container.classList.add('loading');
       if (!container.querySelector('.skeleton-loader')) {
         const loader = document.createElement('div');
@@ -495,20 +667,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
 
-    kpiCards.forEach(card => {
+    kpiCards.forEach((card) => {
       card.classList.add('loading');
       card.innerHTML = '<div class="skeleton-loader"></div>';
     });
 
     if (executiveSummaryContainer) {
-      executiveSummaryContainer.innerHTML = '<div class="skeleton-loader" style="height: 160px;"></div>';
+      executiveSummaryContainer.innerHTML =
+        '<div class="skeleton-loader" style="height: 160px;"></div>';
     }
   }
 
   function showErrorState() {
-    document.querySelectorAll('.loading').forEach(el => el.classList.remove('loading'));
+    document
+      .querySelectorAll('.loading')
+      .forEach((el) => el.classList.remove('loading'));
 
-    kpiCards.forEach(card => {
+    kpiCards.forEach((card) => {
       card.classList.add('error');
       card.innerHTML = getErrorHTML();
     });

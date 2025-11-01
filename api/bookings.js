@@ -164,7 +164,7 @@ async function recordSaleAndCommission(booking, employee) {
     id: saleId,
     booking_id: booking.id,
     employee_id: booking.employee_id || '',
-    employee_name: booking.employee_name || employee?.name || '',
+    employee_name: booking.employee_name || employee?.full_name  || '',
     amount: price,
     commission_amount: commission,
     created_at: new Date().toISOString(),
@@ -286,7 +286,7 @@ export default async function handler(req, res) {
         status: STATUS_BOOKED,
         reference,
         employee_id: employee && employee.id ? employee.id : '',
-        employee_name: employee && employee.name ? employee.name : '',
+        employee_name: employee && employee.full_name ? employee.full_name : '',
         price: clientPrice != null ? clientPrice : servicePrice,
         created_at: new Date().toISOString(),
       };
@@ -342,7 +342,7 @@ export default async function handler(req, res) {
         const emp = staff.find((s) => s.id === newEmployeeId);
 
         updateData.employee_id = emp ? emp.id : newEmployeeId;
-        updateData.employee_name = emp && emp.name ? emp.name : '';
+        updateData.employee_name = emp && emp.full_name ? emp.full_name : '';
       }
 
       if (Object.keys(updateData).length > 0) {

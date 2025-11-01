@@ -1,4 +1,5 @@
 // Modern Salon Booking Application
+// public/app.js
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize App
   const app = new SalonBookingApp();
@@ -36,19 +37,19 @@ class SalonBookingApp {
   async init() {
     try {
       loading.show('Initializing booking system...');
-      
+
       // Load services
       await this.loadServices();
-      
+
       // Setup calendar
       this.setupCalendar();
-      
+
       // Setup event listeners
       this.setupEventListeners();
-      
+
       // Setup form validation
       this.setupFormValidation();
-      
+
       toast.success('Booking system ready!');
     } catch (error) {
       console.error('Initialization error:', error);
@@ -60,7 +61,7 @@ class SalonBookingApp {
 
   async loadServices() {
     const result = await apiRequest('/api/services');
-    
+
     if (result.success) {
       this.state.services = result.data;
       this.populateServiceSelect();
@@ -79,27 +80,27 @@ class SalonBookingApp {
       { id: 'manicure-deluxe', name: 'Deluxe Manicure', duration: 45, price: 400, category: 'Manicures' },
       { id: 'manicure-gel', name: 'Gel Manicure', duration: 60, price: 500, category: 'Manicures' },
       { id: 'manicure-acrylic', name: 'Acrylic Full Set', duration: 90, price: 650, category: 'Manicures' },
-      
+
       // Pedicures
       { id: 'pedicure-basic', name: 'Basic Pedicure', duration: 45, price: 350, category: 'Pedicures' },
       { id: 'pedicure-deluxe', name: 'Deluxe Pedicure', duration: 60, price: 500, category: 'Pedicures' },
       { id: 'pedicure-spa', name: 'Spa Pedicure', duration: 90, price: 700, category: 'Pedicures' },
-      
+
       // Massages
       { id: 'massage-swedish', name: 'Swedish Massage (60min)', duration: 60, price: 850, category: 'Massages' },
       { id: 'massage-deep', name: 'Deep Tissue (60min)', duration: 60, price: 950, category: 'Massages' },
       { id: 'massage-hotstone', name: 'Hot Stone (75min)', duration: 75, price: 1100, category: 'Massages' },
-      
+
       // Facials
       { id: 'facial-basic', name: 'Basic Facial', duration: 60, price: 750, category: 'Facials' },
       { id: 'facial-deluxe', name: 'Deluxe Facial', duration: 90, price: 1200, category: 'Facials' },
-      
+
       // Waxing
       { id: 'wax-brows', name: 'Eyebrow Wax', duration: 15, price: 200, category: 'Waxing' },
       { id: 'wax-underarm', name: 'Underarm Wax', duration: 20, price: 250, category: 'Waxing' },
       { id: 'wax-brazilian', name: 'Brazilian Wax', duration: 30, price: 550, category: 'Waxing' },
       { id: 'wax-legs', name: 'Full Leg Wax', duration: 45, price: 600, category: 'Waxing' },
-      
+
       // Specialty
       { id: 'service-lash', name: 'Eyelash Extensions', duration: 120, price: 1250, category: 'Specialty' },
       { id: 'service-brow', name: 'Microblading', duration: 120, price: 3000, category: 'Specialty' }
@@ -198,18 +199,26 @@ class SalonBookingApp {
       if (result.success) {
         const events = result.data.map(booking => {
           const service = this.state.services.find(s => s.id === booking.service_id);
+          const status = booking.status || 'BOOKED';
+
+          // color by status
+          let bg = '#9333ea';   // BOOKED
+          if (status === 'IN_SESSION') bg = '#f97316';
+          if (status === 'COMPLETED_PAID') bg = '#22c55e';
+
           return {
             id: booking.id,
             title: service?.name || 'Booking',
             start: booking.start_time,
             end: booking.end_time,
-            backgroundColor: '#9333ea',
-            borderColor: '#7e22ce',
+            backgroundColor: bg,
+            borderColor: bg,
             extendedProps: {
               customer: booking.customer_name,
               service: service?.name,
-              price: service?.price,
-              reference: booking.reference
+              price: booking.price ?? service?.price,
+              reference: booking.reference,
+              status
             }
           };
         });
@@ -242,24 +251,63 @@ class SalonBookingApp {
     selectInfo.view.calendar.unselect();
   }
 
+  // ✅ UPDATED: now supports status updates
   async handleEventClick(clickInfo) {
     const event = clickInfo.event;
     const props = event.extendedProps;
-    
-    const message = `
-Service: ${props.service || 'Unknown'}
-Customer: ${props.customer || 'Unknown'}
-Price: ${formatCurrency(props.price || 0)}
-Time: ${dateUtils.format(event.start, 'full')}
-Reference: ${props.reference || 'N/A'}
 
-Would you like to cancel this appointment?
-    `.trim();
+    const service = props.service || 'Unknown';
+    const customer = props.customer || 'Unknown';
+    const price = formatCurrency(props.price || 0);
+    const time = dateUtils.format(event.start, 'full');
+    const currentStatus = props.status || 'BOOKED';
 
-    const confirmed = await window.confirm(message);
-    
-    if (confirmed) {
-      await this.cancelBooking(event.id);
+    const choice = prompt(
+      [
+        `📅 Booking`,
+        `Service: ${service}`,
+        `Customer: ${customer}`,
+        `Price: ${price}`,
+        `Time: ${time}`,
+        `Current status: ${currentStatus}`,
+        '',
+        'Choose action:',
+        '1 = Mark IN_SESSION',
+        '2 = Mark COMPLETED_PAID',
+        '3 = Cancel booking',
+        '0 = Do nothing'
+      ].join('\n')
+    );
+
+    switch (choice) {
+      case '1':
+        await this.updateBookingStatus(event.id, 'IN_SESSION');
+        break;
+      case '2':
+        // this triggers sales/commission in backend like your curl
+        await this.updateBookingStatus(event.id, 'COMPLETED_PAID');
+        break;
+      case '3':
+        await this.cancelBooking(event.id);
+        break;
+      default:
+        // do nothing
+        break;
+    }
+  }
+
+  // ✅ NEW: PATCH wrapper
+  async updateBookingStatus(bookingId, status) {
+    const result = await apiRequest(`/api/bookings?id=${bookingId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    });
+
+    if (result.success) {
+      toast.success(`Booking marked as ${status}`);
+      this.state.calendar.refetchEvents();
+    } else {
+      toast.error(result.error || 'Failed to update booking');
     }
   }
 
@@ -314,8 +362,6 @@ Would you like to cancel this appointment?
     if (datetime) {
       const startTime = new Date(datetime);
       const endTime = dateUtils.addMinutes(startTime, durationMinutes);
-      
-      // Could display this in the UI if you have an element for it
       console.log('Appointment will end at:', dateUtils.format(endTime, 'time'));
     }
   }
@@ -356,14 +402,12 @@ Would you like to cancel this appointment?
   async handleBookingSubmit() {
     // Validate form
     const validation = validateForm(this.elements.form);
-    
+
     if (!validation.isValid) {
       toast.error('Please fix the form errors');
       return;
     }
 
-    const serviceOption = this.elements.serviceSelect.selectedOptions[0];
-    
     const formData = {
       customer_name: this.elements.customerName.value.trim(),
       email: this.elements.customerEmail.value.trim(),
@@ -372,7 +416,6 @@ Would you like to cancel this appointment?
       start_time: new Date(this.elements.appointmentDatetime.value).toISOString()
     };
 
-    // Additional validation
     if (!formData.service_id) {
       toast.error('Please select a service');
       return;
@@ -389,7 +432,7 @@ Would you like to cancel this appointment?
         `✨ Booking confirmed for ${service?.name || 'your service'}! See you at Sassy De'Beaute!`,
         5000
       );
-      
+
       this.state.calendar.refetchEvents();
       this.modalManager.close();
       this.elements.form.reset();
@@ -402,7 +445,6 @@ Would you like to cancel this appointment?
 // Service Worker for offline functionality (optional)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Uncomment to enable service worker
     // navigator.serviceWorker.register('/sw.js')
     //   .then(registration => console.log('SW registered:', registration))
     //   .catch(error => console.log('SW registration failed:', error));
