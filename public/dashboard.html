@@ -1,3 +1,4 @@
+<!-- public/dashboard.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,7 +6,7 @@
   <title>Sassy De'Beaute | Manager Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark">
-  
+
   <!-- SF Pro via system fonts -->
   <style>
     @supports (font: -apple-system-body) {
@@ -16,18 +17,18 @@
   <!-- Internal Dashboard Styles -->
   <link href="dashboard.css" rel="stylesheet" />
 
-  <!-- Chart.js with animation plugins -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
-      <!-- 🌟 bookings Link -->
-      <nav class="nav-links">
-        <a href="index.html" class="dashboard-link">Booking app</a>
-      </nav>
-    </head>
 </head>
 <body>
+  <!-- 🌟 bookings Link (MOVED OUT OF <head>) -->
+  <nav class="nav-links">
+    <a href="index.html" class="dashboard-link">Booking app</a>
+  </nav>
+
   <div class="container">
-    <!-- Minimal Apple-style Header -->
+    <!-- Header -->
     <header class="app-header">
       <div class="header-content">
         <h1 class="app-title">Sassy De'Beaute</h1>
@@ -45,18 +46,10 @@
 
     <!-- KPI Summary Cards -->
     <section class="kpi-grid">
-      <div class="kpi-card loading">
-        <div class="skeleton-loader"></div>
-      </div>
-      <div class="kpi-card loading">
-        <div class="skeleton-loader"></div>
-      </div>
-      <div class="kpi-card loading">
-        <div class="skeleton-loader"></div>
-      </div>
-      <div class="kpi-card loading">
-        <div class="skeleton-loader"></div>
-      </div>
+      <div class="kpi-card loading"><div class="skeleton-loader"></div></div>
+      <div class="kpi-card loading"><div class="skeleton-loader"></div></div>
+      <div class="kpi-card loading"><div class="skeleton-loader"></div></div>
+      <div class="kpi-card loading"><div class="skeleton-loader"></div></div>
     </section>
 
     <!-- Time Period Selector -->
@@ -120,6 +113,43 @@
         </div>
         <div id="daily-table" class="data-table"></div>
       </section>
+
+      <!-- NEW: Bookings per Employee -->
+      <section class="card">
+        <div class="card-header">
+          <h2>Bookings per Employee</h2>
+          <button class="card-action">Staff View</button>
+        </div>
+        <div class="chart-container loading">
+          <canvas id="employeeBookingsChart"></canvas>
+          <div class="skeleton-loader"></div>
+        </div>
+        <div id="employee-bookings-table" class="data-table"></div>
+      </section>
+
+      <!-- NEW: Commission per Employee -->
+      <section class="card">
+        <div class="card-header">
+          <h2>Commission per Employee</h2>
+          <button class="card-action">Export</button>
+        </div>
+        <div class="chart-container loading">
+          <canvas id="employeeCommissionChart"></canvas>
+          <div class="skeleton-loader"></div>
+        </div>
+        <div id="employee-commission-table" class="data-table"></div>
+      </section>
+
+      <!-- NEW: Executive Summary -->
+      <section class="card executive-card">
+        <div class="card-header">
+          <h2>Executive Summary</h2>
+          <button class="card-action" id="exec-refresh">Refresh</button>
+        </div>
+        <div id="executive-summary" class="executive-summary">
+          <div class="skeleton-loader" style="height: 160px;"></div>
+        </div>
+      </section>
     </main>
 
     <footer class="app-footer">
@@ -132,6 +162,6 @@
     </footer>
   </div>
 
-  <script  src="dashboard.js"></script>
+  <script src="dashboard.js"></script>
 </body>
 </html>
