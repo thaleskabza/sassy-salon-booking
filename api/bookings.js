@@ -1,224 +1,135 @@
 // api/bookings.js
-// Booking endpoint with:
-// - service validation
-// - round-robin employee allocation
-// - per-employee availability check
-// - booking statuses: BOOKED | IN_SESSION | COMPLETED_PAID
-// - commission + sale record on COMPLETED_PAID
-
 import redis from './_redis.js';
 import { nanoid } from 'nanoid';
-import { ensureServicesSeeded } from './services.js';
 
-// ---------- CONSTANTS ----------
-const BOOKING_SET_KEY = 'bookings:all';
-const STAFF_SET_KEY = 'staff:all';
-const STAFF_RR_POINTER_KEY = 'staff:rr:pointer';
-const SALES_SET_KEY = 'sales:all';
-
-const STATUS_BOOKED = 'BOOKED';
-const STATUS_IN_SESSION = 'IN_SESSION';
-const STATUS_COMPLETED_PAID = 'COMPLETED_PAID';
-
-const DEFAULT_COMMISSION_RATE = 0.30; // 30%
-
-// ---------- COMMON UTILS ----------
-
-/**
- * Redis cannot receive undefined values in HSET.
- * This will turn undefined / null into '' and numbers into strings.
- */
-function sanitizeForRedis(obj) {
-  const out = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v === undefined || v === null) {
-      out[k] = '';
-    } else if (typeof v === 'number') {
-      out[k] = String(v);
-    } else {
-      out[k] = v;
-    }
-  }
-  return out;
+// helper: get period in same format as /api/sales.js: YYYY-MM-1 | YYYY-MM-2
+function getPeriodFromDate(dateStr) {
+  const d = new Date(dateStr);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = d.getDate();
+  const half = day <= 15 ? '1' : '2';
+  return `${y}-${m}-${half}`;
 }
 
-async function fetchAllBookings() {
-  const keys = await redis.sMembers(BOOKING_SET_KEY);
-  if (!keys || keys.length === 0) return [];
-  const rows = await Promise.all(keys.map((key) => redis.hGetAll(key)));
-  return rows.map((b) => ({
-    ...b,
-    price: b.price ? Number(b.price) : 0,
-  }));
+// fetch service to get price/duration
+async function getServiceById(serviceId) {
+  if (!serviceId) return null;
+  const svc = await redis.hGetAll(`service:${serviceId}`);
+  if (!svc || !svc.id) return null;
+  return {
+    ...svc,
+    price: svc.price ? Number(svc.price) : 0,
+    duration: svc.duration ? Number(svc.duration) : 0
+  };
 }
 
-async function fetchAllStaff() {
-  const keys = await redis.sMembers(STAFF_SET_KEY);
-  if (!keys || keys.length === 0) return [];
-  const staff = await Promise.all(keys.map((key) => redis.hGetAll(key)));
-
-  // filter out half-seeded staff
-  return staff
-    .filter((s) => s && s.id) // must have id
-    .map((s) => ({
-      ...s,
-      commission_rate: s.commission_rate ? Number(s.commission_rate) : null,
-    }));
+// fetch staff to get commission rate
+async function getStaffById(staffId) {
+  if (!staffId) return null;
+  const st = await redis.hGetAll(`staff:${staffId}`);
+  if (!st || !st.id) return null;
+  return {
+    ...st,
+    commission_rate: st.commission_rate ? Number(st.commission_rate) : null,
+    full_name: st.full_name || st.name || st.display_name || st.id
+  };
 }
 
-async function getStaffRoundRobinPointer() {
-  const val = await redis.get(STAFF_RR_POINTER_KEY);
-  return val ? Number(val) : 0;
-}
+// create a sale entry when booking is COMPLETED_PAID
+async function createSaleFromBooking(booking) {
+  const {
+    id: bookingId,
+    employee_id,
+    employee_name,
+    service_id,
+    start_time,
+    price: bookingPrice
+  } = booking;
 
-async function setStaffRoundRobinPointer(nextIndex) {
-  await redis.set(STAFF_RR_POINTER_KEY, String(nextIndex));
-}
-
-// ---------- SERVICE VALIDATION ----------
-
-async function validateService(service_id) {
-  await ensureServicesSeeded();
-
-  const exists = await redis.exists(`service:${service_id}`);
-  if (!exists) {
-    throw new Error(`Service ${service_id} not found`);
-  }
-  return redis.hGetAll(`service:${service_id}`);
-}
-
-// ---------- AVAILABILITY & ROUND ROBIN ----------
-
-function isEmployeeFreeForSlot(employeeId, allBookings, startIso, endIso) {
-  const start = new Date(startIso).getTime();
-  const end = new Date(endIso).getTime();
-
-  return !allBookings.some((b) => {
-    if (!b.employee_id) return false;
-    if (b.employee_id !== employeeId) return false;
-
-    const bStart = new Date(b.start_time).getTime();
-    const bEnd = new Date(b.end_time).getTime();
-
-    return start < bEnd && end > bStart;
-  });
-}
-
-async function findAvailableEmployee(start_time, end_time) {
-  const staff = await fetchAllStaff();
-  if (!staff || staff.length === 0) {
-    return { employee: null, nextPointer: 0 };
-  }
-
-  const bookings = await fetchAllBookings();
-  const pointer = await getStaffRoundRobinPointer();
-  const total = staff.length;
-
-  for (let i = 0; i < total; i++) {
-    const idx = (pointer + i) % total;
-    const candidate = staff[idx];
-
-    // extra guard: candidate must have id
-    if (!candidate.id) continue;
-
-    const free = isEmployeeFreeForSlot(candidate.id, bookings, start_time, end_time);
-    if (free) {
-      const nextPointer = (idx + 1) % total;
-      return { employee: candidate, nextPointer };
+  // get price
+  let amount = bookingPrice ? Number(bookingPrice) : 0;
+  if (!amount && service_id) {
+    const svc = await getServiceById(service_id);
+    if (svc && svc.price) {
+      amount = Number(svc.price);
     }
   }
 
-  return { employee: null, nextPointer: pointer };
-}
+  // if still 0, just don't create a sale
+  if (!amount) return;
 
-// ---------- BOOKING CONFLICT (per service) ----------
+  // staff / commission
+  let commission_amount = 0;
+  let staffId = employee_id;
+  if (staffId) {
+    const staff = await getStaffById(staffId);
+    if (staff && staff.commission_rate) {
+      commission_amount = Math.round((amount * staff.commission_rate) / 100);
+    }
+  }
 
-async function checkBookingConflict(service_id, start_time, end_time) {
-  const allBookings = await fetchAllBookings();
-  return allBookings.some((booking) => {
-    const bookingStart = new Date(booking.start_time);
-    const bookingEnd = new Date(booking.end_time);
-    const newStart = new Date(start_time);
-    const newEnd = new Date(end_time);
+  const saleId = `sale-${nanoid(6)}`;
+  const key = `sale:${saleId}`;
+  const createdAt = new Date().toISOString();
+  const period = getPeriodFromDate(start_time || createdAt);
 
-    return (
-      booking.service_id === service_id &&
-      !(newEnd <= bookingStart || newStart >= bookingEnd)
-    );
-  });
-}
-
-// ---------- COMMISSION / SALE RECORDS ----------
-
-function calcCommissionAmount(price, commissionRate) {
-  const rate = commissionRate != null ? commissionRate : DEFAULT_COMMISSION_RATE;
-  return Math.round(price * rate * 100) / 100;
-}
-
-async function recordSaleAndCommission(booking, employee) {
-  const price = booking.price ? Number(booking.price) : 0;
-  const commission = calcCommissionAmount(price, employee?.commission_rate);
-
-  const saleId = `sale:${booking.id}`;
-  const saleRecord = sanitizeForRedis({
+  // write sale
+  await redis.hSet(key, {
     id: saleId,
-    booking_id: booking.id,
-    employee_id: booking.employee_id || '',
-    employee_name: booking.employee_name || employee?.full_name  || '',
-    amount: price,
-    commission_amount: commission,
-    created_at: new Date().toISOString(),
+    booking_id: bookingId,
+    employee_id: employee_id || '',
+    employee_name: employee_name || '',
+    service_id: service_id || '',
+    amount: String(amount),
+    commission_amount: String(commission_amount),
+    created_at: createdAt,
+    period
   });
 
-  await redis.hSet(saleId, saleRecord);
-  await redis.sAdd(SALES_SET_KEY, saleId);
-
-  // also persist commission on booking
-  await redis.hSet(`booking:${booking.id}`, sanitizeForRedis({
-    commission_amount: commission,
-  }));
+  // indexes
+  await redis.sAdd('sales:all', key);                      // global
+  await redis.sAdd(`sales:${period}`, key);                // per period
+  if (employee_id) {
+    await redis.sAdd(`sales:${employee_id}:${period}`, key); // per staff + period
+  }
 }
 
-// ---------- HANDLER ----------
+// list bookings (optionally by date)
+async function listBookings(from, to) {
+  const keys = await redis.sMembers('bookings:all');
+  if (!keys || keys.length === 0) return [];
+  const rows = await Promise.all(keys.map(k => redis.hGetAll(k)));
+
+  const all = rows.map((b) => ({
+    ...b,
+    price: b.price ? Number(b.price) : undefined
+  }));
+
+  if (!from || !to) return all;
+
+  const start = new Date(from);
+  const end = new Date(to);
+  return all.filter((b) => {
+    const d = new Date(b.start_time);
+    return d >= start && d <= end;
+  });
+}
 
 export default async function handler(req, res) {
-  // ----------- GET -----------
+  // GET /api/bookings?from=&to=
   if (req.method === 'GET') {
     try {
-      const { from, to, cellphone, employee_id, status } = req.query;
-      let all = await fetchAllBookings();
-
-      if (from && to) {
-        const start = new Date(from);
-        const end = new Date(to);
-        all = all.filter(
-          (b) =>
-            new Date(b.start_time) >= start &&
-            new Date(b.end_time) <= end
-        );
-      }
-
-      if (cellphone) {
-        all = all.filter((b) => b.cellphone === cellphone);
-      }
-
-      if (employee_id) {
-        all = all.filter((b) => b.employee_id === employee_id);
-      }
-
-      if (status) {
-        const wanted = Array.isArray(status) ? status : [status];
-        all = all.filter((b) => wanted.includes(b.status));
-      }
-
-      return res.status(200).json(all);
+      const { from, to } = req.query;
+      const data = await listBookings(from, to);
+      return res.status(200).json(data);
     } catch (err) {
-      console.error('Error listing bookings:', err);
+      console.error('GET /api/bookings', err);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
 
-  // ----------- POST (create) -----------
+  // POST /api/bookings
   if (req.method === 'POST') {
     try {
       const {
@@ -227,170 +138,134 @@ export default async function handler(req, res) {
         cellphone,
         service_id,
         start_time,
-        end_time: clientEndTime,
-        employee_id: clientEmployeeId,
-        price: clientPrice,
-      } = req.body;
+        employee_id,
+        employee_name
+      } = req.body || {};
 
-      if (!customer_name || !service_id || !start_time) {
-        return res.status(400).json({ error: 'Missing required fields' });
+      if (!customer_name || !email || !cellphone || !service_id || !start_time) {
+        return res.status(400).json({ error: 'customer_name, email, cellphone, service_id, start_time required' });
       }
 
-      // 1. service
-      const service = await validateService(service_id);
-      const durationMs = service.duration ? Number(service.duration) * 60000 : 60 * 60000;
-      const servicePrice = service.price ? Number(service.price) : 0;
+      const id = nanoid(21);
+      const key = `booking:${id}`;
 
-      // 2. end time
-      const computedEnd = clientEndTime
-        ? new Date(clientEndTime)
-        : new Date(new Date(start_time).getTime() + durationMs);
-      const end_time = computedEnd.toISOString();
-
-      // 3. check service-level conflict
-      if (await checkBookingConflict(service_id, start_time, end_time)) {
-        return res.status(409).json({ error: 'Time slot unavailable for this service' });
+      // prefer service price
+      let price = 0;
+      const svc = await getServiceById(service_id);
+      if (svc && svc.price) {
+        price = svc.price;
       }
 
-      // 4. employee allocation
-      let employee = null;
+      const createdAt = new Date().toISOString();
 
-      if (clientEmployeeId) {
-        const allBookings = await fetchAllBookings();
-        const free = isEmployeeFreeForSlot(clientEmployeeId, allBookings, start_time, end_time);
-        if (!free) {
-          return res.status(409).json({ error: 'Selected therapist is busy in that slot' });
-        }
-        const staff = await fetchAllStaff();
-        employee = staff.find((s) => s.id === clientEmployeeId) || null;
-      } else {
-        const { employee: allocated, nextPointer } = await findAvailableEmployee(start_time, end_time);
-        if (!allocated) {
-          return res.status(409).json({ error: 'All therapists are busy in that slot' });
-        }
-        employee = allocated;
-        await setStaffRoundRobinPointer(nextPointer);
-      }
-
-      const id = nanoid();
-      const reference = `SM-${nanoid(6).toUpperCase()}`;
-
-      const booking = {
+      const bookingData = {
         id,
         customer_name,
-        email: email || '',
-        cellphone: cellphone || '',
+        email,
+        cellphone,
         service_id,
         start_time,
-        end_time,
-        status: STATUS_BOOKED,
-        reference,
-        employee_id: employee && employee.id ? employee.id : '',
-        employee_name: employee && employee.full_name ? employee.full_name : '',
-        price: clientPrice != null ? clientPrice : servicePrice,
-        created_at: new Date().toISOString(),
+        end_time: svc && svc.duration
+          ? new Date(new Date(start_time).getTime() + svc.duration * 60000).toISOString()
+          : start_time,
+        status: 'BOOKED',
+        reference: `SM-${nanoid(6).toUpperCase()}`,
+        employee_id: employee_id || '',
+        employee_name: employee_name || '',
+        price: String(price),
+        created_at: createdAt
       };
 
-      // 🚩 sanitize before write
-      await redis.hSet(`booking:${id}`, sanitizeForRedis(booking));
-      await redis.sAdd(BOOKING_SET_KEY, `booking:${id}`);
+      await redis.hSet(key, bookingData);
+      await redis.sAdd('bookings:all', key);
 
-      return res.status(201).json(booking);
+      return res.status(201).json({
+        success: true,
+        id,
+        booking: {
+          ...bookingData,
+          price
+        }
+      });
     } catch (err) {
-      console.error('Error creating booking:', err);
-
-      if (err.message.startsWith('Service ') && err.message.endsWith(' not found')) {
-        return res.status(400).json({ error: err.message });
-      }
-
+      console.error('POST /api/bookings', err);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
 
-  // ----------- PATCH (update status / reassign) -----------
+  // PATCH /api/bookings?id=...
   if (req.method === 'PATCH') {
     try {
       const { id } = req.query;
-      if (!id) return res.status(400).json({ error: 'Missing booking ID' });
+      if (!id) {
+        return res.status(400).json({ error: 'id required' });
+      }
 
       const key = `booking:${id}`;
-      const exists = await redis.exists(key);
-      if (!exists) return res.status(404).json({ error: 'Booking not found' });
+      const existing = await redis.hGetAll(key);
+      if (!existing || !existing.id) {
+        return res.status(404).json({ error: 'Booking not found' });
+      }
 
-      const current = await redis.hGetAll(key);
+      const { status, employee_id, employee_name } = req.body || {};
 
-      const { status, employee_id: newEmployeeId } = req.body;
-      const updateData = {};
+      // build update payload
+      const update = {};
 
       if (status) {
-        updateData.status = status;
+        update.status = status;
+      }
+      if (employee_id) {
+        update.employee_id = employee_id;
+      }
+      if (employee_name) {
+        update.employee_name = employee_name;
       }
 
-      if (newEmployeeId) {
-        const allBookings = await fetchAllBookings();
-        const free = isEmployeeFreeForSlot(
-          newEmployeeId,
-          allBookings,
-          current.start_time,
-          current.end_time
-        );
-        if (!free) {
-          return res.status(409).json({ error: 'New therapist is busy in that slot' });
-        }
-
-        const staff = await fetchAllStaff();
-        const emp = staff.find((s) => s.id === newEmployeeId);
-
-        updateData.employee_id = emp ? emp.id : newEmployeeId;
-        updateData.employee_name = emp && emp.full_name ? emp.full_name : '';
+      // write changes
+      if (Object.keys(update).length > 0) {
+        await redis.hSet(key, update);
       }
 
-      if (Object.keys(updateData).length > 0) {
-        await redis.hSet(key, sanitizeForRedis(updateData));
+      // if status → COMPLETED_PAID and wasn't previously
+      if (status === 'COMPLETED_PAID' && existing.status !== 'COMPLETED_PAID') {
+        // re-read booking to get merged view
+        const fresh = {
+          ...existing,
+          ...update
+        };
+        await createSaleFromBooking(fresh);
       }
 
-      // if completed and paid, create sale + commission
-      if (status === STATUS_COMPLETED_PAID) {
-        const fresh = await redis.hGetAll(key);
-
-        let employee = null;
-        if (fresh.employee_id) {
-          const staff = await fetchAllStaff();
-          employee = staff.find((s) => s.id === fresh.employee_id) || null;
-        }
-
-        await recordSaleAndCommission(fresh, employee);
-      }
-
-      const updated = await redis.hGetAll(key);
-      return res.status(200).json(updated);
+      return res.status(200).json({ success: true });
     } catch (err) {
-      console.error('Error updating booking:', err);
+      console.error('PATCH /api/bookings', err);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
 
-  // ----------- DELETE (cancel) -----------
+  // DELETE /api/bookings?id=...
   if (req.method === 'DELETE') {
     try {
       const { id } = req.query;
-      if (!id) return res.status(400).json({ error: 'Missing booking ID' });
+      if (!id) return res.status(400).json({ error: 'id required' });
 
       const key = `booking:${id}`;
-      const exists = await redis.exists(key);
-      if (!exists) return res.status(404).json({ error: 'Booking not found' });
+      const existing = await redis.hGetAll(key);
+      if (!existing || !existing.id) {
+        return res.status(404).json({ error: 'Booking not found' });
+      }
 
-      await redis.del(key);
-      await redis.sRem(BOOKING_SET_KEY, key);
+      // soft delete → mark as CANCELLED
+      await redis.hSet(key, { status: 'CANCELLED' });
 
-      return res.status(200).json({ message: 'Booking cancelled successfully' });
+      return res.status(200).json({ success: true });
     } catch (err) {
-      console.error('Error cancelling booking:', err);
+      console.error('DELETE /api/bookings', err);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
 
-  // ----------- FALLBACK -----------
   res.setHeader('Allow', 'GET, POST, PATCH, DELETE');
   return res.status(405).json({ error: 'Method Not Allowed' });
 }

@@ -1,14 +1,13 @@
-// Modern Salon Booking Application
 // public/app.js
+// Modern Salon Booking Application
+
 document.addEventListener('DOMContentLoaded', async () => {
-  // Initialize App
   const app = new SalonBookingApp();
   await app.init();
 });
 
 class SalonBookingApp {
   constructor() {
-    // DOM Elements
     this.elements = {
       calendar: document.getElementById('calendar'),
       modal: document.getElementById('booking-modal'),
@@ -22,7 +21,6 @@ class SalonBookingApp {
       cancelBookingBtn: document.getElementById('cancel-booking')
     };
 
-    // State
     this.state = {
       services: [],
       bookings: [],
@@ -30,7 +28,6 @@ class SalonBookingApp {
       calendar: null
     };
 
-    // Modal Manager
     this.modalManager = new ModalManager('booking-modal');
   }
 
@@ -38,16 +35,9 @@ class SalonBookingApp {
     try {
       loading.show('Initializing booking system...');
 
-      // Load services
       await this.loadServices();
-
-      // Setup calendar
       this.setupCalendar();
-
-      // Setup event listeners
       this.setupEventListeners();
-
-      // Setup form validation
       this.setupFormValidation();
 
       toast.success('Booking system ready!');
@@ -66,7 +56,6 @@ class SalonBookingApp {
       this.state.services = result.data;
       this.populateServiceSelect();
     } else {
-      // Fallback to default services
       this.state.services = this.getDefaultServices();
       this.populateServiceSelect();
       toast.warning('Using offline service list');
@@ -111,7 +100,6 @@ class SalonBookingApp {
     const select = this.elements.serviceSelect;
     select.innerHTML = '<option value="" disabled selected>Choose your treatment</option>';
 
-    // Group by category
     const categories = {};
     this.state.services.forEach(service => {
       if (!categories[service.category]) {
@@ -120,7 +108,6 @@ class SalonBookingApp {
       categories[service.category].push(service);
     });
 
-    // Create optgroups
     Object.entries(categories).forEach(([category, services]) => {
       const optgroup = document.createElement('optgroup');
       optgroup.label = category;
@@ -156,9 +143,7 @@ class SalonBookingApp {
       selectable: true,
       selectMirror: true,
       select: (info) => this.handleDateSelect(info),
-      events: (info, successCallback, failureCallback) => {
-        this.fetchEvents(info, successCallback, failureCallback);
-      },
+      events: (info, success, fail) => this.fetchEvents(info, success, fail),
       eventClick: (info) => this.handleEventClick(info),
       eventDisplay: 'block',
       height: 'auto',
@@ -201,8 +186,7 @@ class SalonBookingApp {
           const service = this.state.services.find(s => s.id === booking.service_id);
           const status = booking.status || 'BOOKED';
 
-          // color by status
-          let bg = '#9333ea';   // BOOKED
+          let bg = '#9333ea'; // BOOKED
           if (status === 'IN_SESSION') bg = '#f97316';
           if (status === 'COMPLETED_PAID') bg = '#22c55e';
 
@@ -216,9 +200,11 @@ class SalonBookingApp {
             extendedProps: {
               customer: booking.customer_name,
               service: service?.name,
-              price: booking.price ?? service?.price,
+              price: booking.price ?? service?.price ?? 0,
               reference: booking.reference,
-              status
+              status,
+              employee_id: booking.employee_id,
+              employee_name: booking.employee_name
             }
           };
         });
@@ -234,7 +220,6 @@ class SalonBookingApp {
   }
 
   handleDateSelect(selectInfo) {
-    // Check if time is in the past
     if (dateUtils.isPast(selectInfo.start)) {
       toast.warning('Cannot book appointments in the past');
       selectInfo.view.calendar.unselect();
@@ -251,7 +236,7 @@ class SalonBookingApp {
     selectInfo.view.calendar.unselect();
   }
 
-  // ✅ UPDATED: now supports status updates
+  // EVENT CLICK → show actions
   async handleEventClick(clickInfo) {
     const event = clickInfo.event;
     const props = event.extendedProps;
@@ -267,6 +252,7 @@ class SalonBookingApp {
         `📅 Booking`,
         `Service: ${service}`,
         `Customer: ${customer}`,
+        `Employee: ${props.employee_name || 'Unassigned'}`,
         `Price: ${price}`,
         `Time: ${time}`,
         `Current status: ${currentStatus}`,
@@ -284,19 +270,16 @@ class SalonBookingApp {
         await this.updateBookingStatus(event.id, 'IN_SESSION');
         break;
       case '2':
-        // this triggers sales/commission in backend like your curl
         await this.updateBookingStatus(event.id, 'COMPLETED_PAID');
         break;
       case '3':
         await this.cancelBooking(event.id);
         break;
       default:
-        // do nothing
         break;
     }
   }
 
-  // ✅ NEW: PATCH wrapper
   async updateBookingStatus(bookingId, status) {
     const result = await apiRequest(`/api/bookings?id=${bookingId}`, {
       method: 'PATCH',
@@ -325,7 +308,6 @@ class SalonBookingApp {
   }
 
   setupEventListeners() {
-    // Close modal buttons
     if (this.elements.closeModalBtn) {
       this.elements.closeModalBtn.addEventListener('click', () => {
         this.modalManager.close();
@@ -338,7 +320,6 @@ class SalonBookingApp {
       });
     }
 
-    // Form submission
     if (this.elements.form) {
       this.elements.form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -346,12 +327,11 @@ class SalonBookingApp {
       });
     }
 
-    // Service change - update duration display
     if (this.elements.serviceSelect) {
       this.elements.serviceSelect.addEventListener('change', (e) => {
         const option = e.target.selectedOptions[0];
         if (option && option.dataset.duration) {
-          this.updateEndTime(parseInt(option.dataset.duration));
+          this.updateEndTime(parseInt(option.dataset.duration, 10));
         }
       });
     }
@@ -367,7 +347,6 @@ class SalonBookingApp {
   }
 
   setupFormValidation() {
-    // Add data-validate attributes
     if (this.elements.customerEmail) {
       this.elements.customerEmail.dataset.validate = 'required,email';
     }
@@ -375,7 +354,6 @@ class SalonBookingApp {
       this.elements.customerPhone.dataset.validate = 'required,phone';
     }
 
-    // Real-time validation
     const inputs = this.elements.form.querySelectorAll('input[data-validate]');
     inputs.forEach(input => {
       input.addEventListener('blur', () => {
@@ -400,9 +378,7 @@ class SalonBookingApp {
   }
 
   async handleBookingSubmit() {
-    // Validate form
     const validation = validateForm(this.elements.form);
-
     if (!validation.isValid) {
       toast.error('Please fix the form errors');
       return;
@@ -442,11 +418,9 @@ class SalonBookingApp {
   }
 }
 
-// Service Worker for offline functionality (optional)
+// Service Worker (optional)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // navigator.serviceWorker.register('/sw.js')
-    //   .then(registration => console.log('SW registered:', registration))
-    //   .catch(error => console.log('SW registration failed:', error));
+    // navigator.serviceWorker.register('/sw.js');
   });
 }
