@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sassy De'Beaute | Staff Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="styles.css" rel="stylesheet" />
+  <style>
+    .staff-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 900px) {
+      .staff-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .staff-form {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    }
+    .staff-list {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.2rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    }
+    .staff-card {
+      display: flex;
+      gap: 1rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(0,0,0,0.03);
+      align-items: center;
+    }
+    .staff-card:last-child {
+      border-bottom: none;
+    }
+    .staff-avatar {
+      width: 54px;
+      height: 54px;
+      border-radius: 999px;
+      background: #f3e8ff;
+      background-size: cover;
+      background-position: center;
+    }
+    .staff-name {
+      font-weight: 600;
+    }
+    .staff-role {
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+    .btn-small {
+      padding: 0.25rem 0.55rem;
+      font-size: 0.7rem;
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="salon-header" style="margin-bottom:2rem;">
+      <div class="logo-container">
+        <h1 class="salon-logo">Sassy De'Beaute</h1>
+        <p class="salon-tagline">Staff Manager</p>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html" class="dashboard-link">Bookings</a>
+        <a href="dashboard.html" class="dashboard-link">Ops Dashboard</a>
+        <a href="commission.html" class="dashboard-link">Commission</a>
+        <a href="staff.html" class="dashboard-link" style="background:#ff375f;">Staff</a>
+      </nav>
+    </header>
+
+    <section class="calendar-section">
+      <h2 class="section-title" style="text-align:left;">Add / Edit Salon Staff</h2>
+
+      <div class="staff-grid">
+        <!-- FORM -->
+        <form id="staff-form" class="staff-form">
+          <input type="hidden" id="staff-id" />
+          <div class="form-group">
+            <label for="full-name">Full Name</label>
+            <input id="full-name" type="text" required placeholder="e.g. Jane Doe" />
+          </div>
+          <div class="form-group">
+            <label for="position">Position / Role</label>
+            <input id="position" type="text" list="position-list" placeholder="Nail Tech, Hair Stylist, Reception..." />
+            <datalist id="position-list">
+              <option value="Nail Technician"></option>
+              <option value="Hair Stylist"></option>
+              <option value="Beautician"></option>
+              <option value="Reception"></option>
+            </datalist>
+          </div>
+          <div class="form-group">
+            <label for="photo-url">Photo URL</label>
+            <input id="photo-url" type="url" placeholder="https://…" />
+          </div>
+          <div class="form-group">
+            <label for="bio">Bio / Short intro</label>
+            <textarea id="bio" rows="4" placeholder="How long they have been with the salon, specialities, languages…"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="basic-salary">Basic Salary (R)</label>
+            <input id="basic-salary" type="number" min="0" step="0.01" value="5000" />
+          </div>
+          <button type="submit" class="btn btn-primary" id="save-btn">Save Staff</button>
+          <button type="button" class="btn btn-secondary" id="reset-btn" style="margin-left:0.5rem;">Reset</button>
+        </form>
+
+        <!-- LIST -->
+        <div class="staff-list">
+          <h3 style="margin-bottom:1rem;">Current Staff</h3>
+          <div id="staff-list-container">
+            <!-- JS injects -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="salon-footer">
+      <p>© 2025 Sassy de'Beaute. All rights reserved.</p>
+      <p>Staff module by Codicis QA</p>
+    </footer>
+  </div>
+
+  <script src="staff.js"></script>
+</body>
+</html>
