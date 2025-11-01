@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
   // DOM Elements with null checks
+  //public/app.js
   const getElement = (id) => {
     const el = document.getElementById(id);
     if (!el) console.error(`Element with ID ${id} not found`);

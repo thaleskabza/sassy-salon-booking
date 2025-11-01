@@ -1,17 +1,20 @@
-// File: api/bookings.js (updated)
+// File: api/bookings.js
 import redis from './_redis.js';
 import { nanoid } from 'nanoid';
+import { ensureServicesSeeded } from './services.js'; 
 
 async function fetchAllBookings() {
   const keys = await redis.sMembers('bookings:all');
-  return Promise.all(
-    keys.map(key => redis.hGetAll(key))
-  );
+  return Promise.all(keys.map((key) => redis.hGetAll(key)));
 }
 
 async function validateService(service_id) {
+  // 👇 make sure services exist
+  await ensureServicesSeeded();
+
   const exists = await redis.exists(`service:${service_id}`);
   if (!exists) {
+    // keep the exact message pattern for the catch block
     throw new Error(`Service ${service_id} not found`);
   }
   return redis.hGetAll(`service:${service_id}`);
@@ -19,7 +22,7 @@ async function validateService(service_id) {
 
 async function checkBookingConflict(service_id, start_time, end_time) {
   const allBookings = await fetchAllBookings();
-  return allBookings.some(booking => {
+  return allBookings.some((booking) => {
     const bookingStart = new Date(booking.start_time);
     const bookingEnd = new Date(booking.end_time);
     const newStart = new Date(start_time);
@@ -39,11 +42,16 @@ export default async function handler(req, res) {
       let all = await fetchAllBookings();
 
       if (from && to) {
-        const start = new Date(from), end = new Date(to);
-        all = all.filter(b => new Date(b.start_time) >= start && new Date(b.end_time) <= end);
+        const start = new Date(from),
+          end = new Date(to);
+        all = all.filter(
+          (b) =>
+            new Date(b.start_time) >= start &&
+            new Date(b.end_time) <= end
+        );
       }
       if (cellphone) {
-        all = all.filter(b => b.cellphone === cellphone);
+        all = all.filter((b) => b.cellphone === cellphone);
       }
       return res.status(200).json(all);
     } catch (err) {
@@ -56,7 +64,9 @@ export default async function handler(req, res) {
     try {
       const { customer_name, email, cellphone, service_id, start_time } = req.body;
 
+      // 👇 this now seeds + validates
       const service = await validateService(service_id);
+
       const durationMs = Number(service.duration) * 60000;
       const end_time = new Date(new Date(start_time).getTime() + durationMs).toISOString();
 
@@ -76,7 +86,7 @@ export default async function handler(req, res) {
         end_time,
         status: 'CONFIRMED',
         reference,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       };
 
       await redis.hSet(`booking:${id}`, booking);
@@ -85,9 +95,12 @@ export default async function handler(req, res) {
       return res.status(201).json(booking);
     } catch (err) {
       console.error('Error creating booking:', err);
-      if (err.message.includes('Service not found')) {
+
+      // your message is of the form: "Service manicure-basic not found"
+      if (err.message.startsWith('Service ') && err.message.endsWith(' not found')) {
         return res.status(400).json({ error: err.message });
       }
+
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }

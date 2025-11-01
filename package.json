@@ -12,7 +12,8 @@
     "format": "^0.2.2",
     "fullcalendar": "^6.1.17",
     "nanoid": "^5.1.5",
-    "redis": "^5.1.0"
+    "redis": "^5.1.0",
+    "vercel": "^48.8.0"
   },
   "repository": {
     "type": "git",
