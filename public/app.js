@@ -1,175 +1,148 @@
+// Modern Salon Booking Application
 document.addEventListener('DOMContentLoaded', async () => {
-  // DOM Elements with null checks
-  //public/app.js
-  const getElement = (id) => {
-    const el = document.getElementById(id);
-    if (!el) console.error(`Element with ID ${id} not found`);
-    return el;
-  };
+  // Initialize App
+  const app = new SalonBookingApp();
+  await app.init();
+});
 
-  // Initialize elements
-  const calendarEl = getElement('calendar');
-  const modal = getElement('booking-modal');
-  const closeModalBtn = getElement('close-modal');
-  const cancelBookingBtn = getElement('cancel-booking');
-  const bookingForm = getElement('booking-form');
-  const loadingIndicator = getElement('loading-indicator');
-  const serviceSelect = getElement('service-select');
+class SalonBookingApp {
+  constructor() {
+    // DOM Elements
+    this.elements = {
+      calendar: document.getElementById('calendar'),
+      modal: document.getElementById('booking-modal'),
+      form: document.getElementById('booking-form'),
+      serviceSelect: document.getElementById('service-select'),
+      customerName: document.getElementById('customer-name'),
+      customerEmail: document.getElementById('customer-email'),
+      customerPhone: document.getElementById('customer-phone'),
+      appointmentDatetime: document.getElementById('appointment-datetime'),
+      closeModalBtn: document.getElementById('close-modal'),
+      cancelBookingBtn: document.getElementById('cancel-booking')
+    };
 
-  // Check if essential elements exist
-  if (!calendarEl || !modal || !bookingForm || !serviceSelect) {
-    console.error('Essential elements missing from DOM');
-    return;
+    // State
+    this.state = {
+      services: [],
+      bookings: [],
+      selectedSlot: null,
+      calendar: null
+    };
+
+    // Modal Manager
+    this.modalManager = new ModalManager('booking-modal');
   }
 
-  // Comprehensive Salon Services Data
-  const defaultServices = [
-    // Manicures
-    { id: 'manicure-basic', name: 'Basic Manicure', duration: 30, price: 25, category: 'Manicures' },
-    { id: 'manicure-deluxe', name: 'Deluxe Manicure', duration: 45, price: 40, category: 'Manicures' },
-    { id: 'manicure-gel', name: 'Gel Manicure', duration: 60, price: 50, category: 'Manicures' },
-    { id: 'manicure-acrylic', name: 'Acrylic Full Set', duration: 90, price: 65, category: 'Manicures' },
-    { id: 'manicure-dip', name: 'Dip Powder Manicure', duration: 75, price: 55, category: 'Manicures' },
-
-    // Pedicures
-    { id: 'pedicure-basic', name: 'Basic Pedicure', duration: 45, price: 35, category: 'Pedicures' },
-    { id: 'pedicure-deluxe', name: 'Deluxe Pedicure', duration: 60, price: 50, category: 'Pedicures' },
-    { id: 'pedicure-gel', name: 'Gel Pedicure', duration: 75, price: 60, category: 'Pedicures' },
-    { id: 'pedicure-spa', name: 'Spa Pedicure', duration: 90, price: 70, category: 'Pedicures' },
-    { id: 'pedicure-athlete', name: "Athlete's Pedicure", duration: 60, price: 55, category: 'Pedicures' },
-
-    // Massages
-    { id: 'massage-swedish', name: 'Swedish Massage (60min)', duration: 60, price: 85, category: 'Massages' },
-    { id: 'massage-deep', name: 'Deep Tissue (60min)', duration: 60, price: 95, category: 'Massages' },
-    { id: 'massage-hotstone', name: 'Hot Stone (75min)', duration: 75, price: 110, category: 'Massages' },
-    { id: 'massage-couples', name: 'Couples Massage (90min)', duration: 90, price: 160, category: 'Massages' },
-    { id: 'massage-prenatal', name: 'Prenatal Massage (60min)', duration: 60, price: 90, category: 'Massages' },
-
-    // Waxing Services
-    { id: 'wax-brows', name: 'Eyebrow Wax', duration: 15, price: 20, category: 'Waxing' },
-    { id: 'wax-lip', name: 'Lip Wax', duration: 10, price: 12, category: 'Waxing' },
-    { id: 'wax-chin', name: 'Chin Wax', duration: 10, price: 15, category: 'Waxing' },
-    { id: 'wax-underarm', name: 'Underarm Wax', duration: 20, price: 25, category: 'Waxing' },
-    { id: 'wax-brazilian', name: 'Brazilian Wax', duration: 30, price: 55, category: 'Waxing' },
-    { id: 'wax-legs', name: 'Full Leg Wax', duration: 45, price: 60, category: 'Waxing' },
-
-    // Facials
-    { id: 'facial-basic', name: 'Basic Facial', duration: 60, price: 75, category: 'Facials' },
-    { id: 'facial-deluxe', name: 'Deluxe Facial', duration: 90, price: 120, category: 'Facials' },
-    { id: 'facial-acne', name: 'Acne Treatment', duration: 75, price: 95, category: 'Facials' },
-    { id: 'facial-antiage', name: 'Anti-Aging Facial', duration: 90, price: 130, category: 'Facials' },
-
-    // Specialty Services
-    { id: 'service-henna', name: 'Henna Tattoo', duration: 45, price: 35, category: 'Specialty' },
-    { id: 'service-lash', name: 'Eyelash Extensions', duration: 120, price: 125, category: 'Specialty' },
-    { id: 'service-brow', name: 'Microblading', duration: 120, price: 300, category: 'Specialty' }
-  ];
-
-  // State
-  let selectedSlot = null;
-  let services = [];
-  let calendar = null;
-
-  // Initialize the application
-  async function init() {
+  async init() {
     try {
-      showLoading();
-
-      // Try to load services from API, fallback to default
-      try {
-        services = await loadServices();
-        console.log('Services loaded from API:', services);
-        if (!services || services.length === 0) {
-          throw new Error('No services returned from API');
-        }
-      } catch (error) {
-        console.warn('Using default services:', error);
-        services = defaultServices;
-      }
-
-      populateServiceSelect();
-      initCalendar();
-      setupEventListeners();
-
-      // Debug: Verify select element
-      console.log('Service select element:', serviceSelect);
-      serviceSelect.addEventListener('click', (e) => {
-        console.log('Select clicked, options:', serviceSelect.options.length);
-      });
-
+      loading.show('Initializing booking system...');
+      
+      // Load services
+      await this.loadServices();
+      
+      // Setup calendar
+      this.setupCalendar();
+      
+      // Setup event listeners
+      this.setupEventListeners();
+      
+      // Setup form validation
+      this.setupFormValidation();
+      
+      toast.success('Booking system ready!');
     } catch (error) {
       console.error('Initialization error:', error);
-      showError('Failed to initialize. Please refresh the page.');
+      toast.error('Failed to initialize booking system');
     } finally {
-      hideLoading();
+      loading.hide();
     }
   }
 
-  // Load available services from API
-  async function loadServices() {
-    try {
-      const response = await fetch('/api/services');
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error loading services:', error);
-      throw error;
+  async loadServices() {
+    const result = await apiRequest('/api/services');
+    
+    if (result.success) {
+      this.state.services = result.data;
+      this.populateServiceSelect();
+    } else {
+      // Fallback to default services
+      this.state.services = this.getDefaultServices();
+      this.populateServiceSelect();
+      toast.warning('Using offline service list');
     }
   }
 
-  // Populate service dropdown with grouped options
-  function populateServiceSelect() {
-    serviceSelect.innerHTML = '';
+  getDefaultServices() {
+    return [
+      // Manicures
+      { id: 'manicure-basic', name: 'Basic Manicure', duration: 30, price: 250, category: 'Manicures' },
+      { id: 'manicure-deluxe', name: 'Deluxe Manicure', duration: 45, price: 400, category: 'Manicures' },
+      { id: 'manicure-gel', name: 'Gel Manicure', duration: 60, price: 500, category: 'Manicures' },
+      { id: 'manicure-acrylic', name: 'Acrylic Full Set', duration: 90, price: 650, category: 'Manicures' },
+      
+      // Pedicures
+      { id: 'pedicure-basic', name: 'Basic Pedicure', duration: 45, price: 350, category: 'Pedicures' },
+      { id: 'pedicure-deluxe', name: 'Deluxe Pedicure', duration: 60, price: 500, category: 'Pedicures' },
+      { id: 'pedicure-spa', name: 'Spa Pedicure', duration: 90, price: 700, category: 'Pedicures' },
+      
+      // Massages
+      { id: 'massage-swedish', name: 'Swedish Massage (60min)', duration: 60, price: 850, category: 'Massages' },
+      { id: 'massage-deep', name: 'Deep Tissue (60min)', duration: 60, price: 950, category: 'Massages' },
+      { id: 'massage-hotstone', name: 'Hot Stone (75min)', duration: 75, price: 1100, category: 'Massages' },
+      
+      // Facials
+      { id: 'facial-basic', name: 'Basic Facial', duration: 60, price: 750, category: 'Facials' },
+      { id: 'facial-deluxe', name: 'Deluxe Facial', duration: 90, price: 1200, category: 'Facials' },
+      
+      // Waxing
+      { id: 'wax-brows', name: 'Eyebrow Wax', duration: 15, price: 200, category: 'Waxing' },
+      { id: 'wax-underarm', name: 'Underarm Wax', duration: 20, price: 250, category: 'Waxing' },
+      { id: 'wax-brazilian', name: 'Brazilian Wax', duration: 30, price: 550, category: 'Waxing' },
+      { id: 'wax-legs', name: 'Full Leg Wax', duration: 45, price: 600, category: 'Waxing' },
+      
+      // Specialty
+      { id: 'service-lash', name: 'Eyelash Extensions', duration: 120, price: 1250, category: 'Specialty' },
+      { id: 'service-brow', name: 'Microblading', duration: 120, price: 3000, category: 'Specialty' }
+    ];
+  }
 
-    // Add default option
-    const defaultOption = document.createElement('option');
-    defaultOption.value = '';
-    defaultOption.textContent = 'Select a service...';
-    defaultOption.disabled = true;
-    defaultOption.selected = true;
-    serviceSelect.appendChild(defaultOption);
+  populateServiceSelect() {
+    const select = this.elements.serviceSelect;
+    select.innerHTML = '<option value="" disabled selected>Choose your treatment</option>';
 
-    // Group services by category
+    // Group by category
     const categories = {};
-    services.forEach(service => {
+    this.state.services.forEach(service => {
       if (!categories[service.category]) {
         categories[service.category] = [];
       }
       categories[service.category].push(service);
     });
 
-    // Create optgroups for each category
-    Object.keys(categories).forEach(category => {
+    // Create optgroups
+    Object.entries(categories).forEach(([category, services]) => {
       const optgroup = document.createElement('optgroup');
       optgroup.label = category;
 
-      categories[category].forEach(service => {
+      services.forEach(service => {
         const option = document.createElement('option');
         option.value = service.id;
-        option.textContent = `${service.name} - R${service.price} (${service.duration} min)`;
+        option.textContent = `${service.name} - ${formatCurrency(service.price)} (${service.duration} min)`;
         option.dataset.duration = service.duration;
         option.dataset.price = service.price;
         optgroup.appendChild(option);
       });
 
-      serviceSelect.appendChild(optgroup);
+      select.appendChild(optgroup);
     });
-
-    // Force dropdown styling
-    serviceSelect.style.display = 'block';
-    serviceSelect.style.opacity = '1';
-    serviceSelect.style.visibility = 'visible';
-    serviceSelect.style.height = 'auto';
   }
 
-  // Initialize FullCalendar
-  function initCalendar() {
+  setupCalendar() {
     if (!window.FullCalendar) {
       throw new Error('FullCalendar library not loaded');
     }
 
-    calendar = new FullCalendar.Calendar(calendarEl, {
+    this.state.calendar = new FullCalendar.Calendar(this.elements.calendar, {
       initialView: 'timeGridWeek',
       headerToolbar: {
         left: 'prev,next today',
@@ -178,11 +151,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       },
       slotMinTime: '08:00:00',
       slotMaxTime: '20:00:00',
+      slotDuration: '00:30:00',
       selectable: true,
       selectMirror: true,
-      select: handleDateSelect,
-      events: fetchEvents,
-      eventClick: handleEventClick,
+      select: (info) => this.handleDateSelect(info),
+      events: (info, successCallback, failureCallback) => {
+        this.fetchEvents(info, successCallback, failureCallback);
+      },
+      eventClick: (info) => this.handleEventClick(info),
       eventDisplay: 'block',
       height: 'auto',
       nowIndicator: true,
@@ -193,247 +169,242 @@ document.addEventListener('DOMContentLoaded', async () => {
       selectConstraint: {
         startTime: '08:00:00',
         endTime: '20:00:00'
+      },
+      businessHours: {
+        daysOfWeek: [1, 2, 3, 4, 5, 6],
+        startTime: '08:00',
+        endTime: '20:00'
+      },
+      eventClassNames: (arg) => {
+        if (dateUtils.isPast(arg.event.start)) {
+          return ['past-event'];
+        }
+        return [];
       }
     });
 
-    calendar.render();
+    this.state.calendar.render();
   }
 
-  // Fetch events for calendar
-  async function fetchEvents(fetchInfo, successCallback, failureCallback) {
+  async fetchEvents(fetchInfo, successCallback, failureCallback) {
     try {
       const params = new URLSearchParams({
         from: fetchInfo.startStr,
         to: fetchInfo.endStr
       });
 
-      const response = await fetch(`/api/bookings?${params}`);
-      if (!response.ok) {
-        throw new Error('Failed to load bookings');
+      const result = await apiRequest(`/api/bookings?${params}`);
+
+      if (result.success) {
+        const events = result.data.map(booking => {
+          const service = this.state.services.find(s => s.id === booking.service_id);
+          return {
+            id: booking.id,
+            title: service?.name || 'Booking',
+            start: booking.start_time,
+            end: booking.end_time,
+            backgroundColor: '#9333ea',
+            borderColor: '#7e22ce',
+            extendedProps: {
+              customer: booking.customer_name,
+              service: service?.name,
+              price: service?.price,
+              reference: booking.reference
+            }
+          };
+        });
+
+        successCallback(events);
+      } else {
+        failureCallback(result.error);
       }
-
-      const bookings = await response.json();
-      const events = bookings.map(booking => ({
-        id: booking.id,
-        title: services.find(s => s.id === booking.service_id)?.name || 'Booking',
-        start: booking.start_time,
-        end: booking.end_time,
-        backgroundColor: '#8B5FBF',
-        borderColor: '#6D3FA8',
-        extendedProps: {
-          customer: booking.customer_name,
-          service: services.find(s => s.id === booking.service_id)?.name,
-          price: services.find(s => s.id === booking.service_id)?.price
-        }
-      }));
-
-      successCallback(events);
     } catch (error) {
       console.error('Error fetching events:', error);
       if (failureCallback) failureCallback(error);
     }
   }
 
-  // Handle date selection
-  function handleDateSelect(selectInfo) {
-    selectedSlot = {
+  handleDateSelect(selectInfo) {
+    // Check if time is in the past
+    if (dateUtils.isPast(selectInfo.start)) {
+      toast.warning('Cannot book appointments in the past');
+      selectInfo.view.calendar.unselect();
+      return;
+    }
+
+    this.state.selectedSlot = {
       start: selectInfo.start,
       end: selectInfo.end
     };
 
-    const datetimeInput = getElement('appointment-datetime');
-    if (datetimeInput) {
-      datetimeInput.value = formatDateTimeForInput(selectInfo.start);
-    }
-
-    openModal();
+    this.elements.appointmentDatetime.value = dateUtils.formatForInput(selectInfo.start);
+    this.modalManager.open();
     selectInfo.view.calendar.unselect();
   }
-  // Handle event click to show booking details and confirm cancellation
-  function handleEventClick(clickInfo) {
-    const serviceName = clickInfo.event.extendedProps.service || 'Unknown Service';
-    const customerName = clickInfo.event.extendedProps.customer || 'Unknown Customer';
-    const price = clickInfo.event.extendedProps.price || 'Price not available';
 
-    const eventTime = clickInfo.event.start.toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  async handleEventClick(clickInfo) {
+    const event = clickInfo.event;
+    const props = event.extendedProps;
+    
+    const message = `
+Service: ${props.service || 'Unknown'}
+Customer: ${props.customer || 'Unknown'}
+Price: ${formatCurrency(props.price || 0)}
+Time: ${dateUtils.format(event.start, 'full')}
+Reference: ${props.reference || 'N/A'}
+
+Would you like to cancel this appointment?
+    `.trim();
+
+    const confirmed = await window.confirm(message);
+    
+    if (confirmed) {
+      await this.cancelBooking(event.id);
+    }
+  }
+
+  async cancelBooking(bookingId) {
+    const result = await apiRequest(`/api/bookings?id=${bookingId}`, {
+      method: 'DELETE'
     });
 
-    const confirmMsg = `💅 ${serviceName}\n👤 ${customerName}\n💰 R${price}\n⏰ ${eventTime}\n\nDo you want to cancel this appointment?`;
-
-    if (confirm(confirmMsg)) {
-      deleteAppointment(clickInfo.event.id);
+    if (result.success) {
+      toast.success('Appointment cancelled successfully');
+      this.state.calendar.refetchEvents();
+    } else {
+      toast.error(result.error || 'Failed to cancel appointment');
     }
   }
-  // Delete appointment from backend
-  async function deleteAppointment(bookingId) {
-    try {
-      showLoading();
-      const response = await fetch(`/api/bookings?id=${bookingId}`, { method: 'DELETE' });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to cancel appointment');
-      }
-
-      calendar.refetchEvents();
-      alert('🚫 Appointment cancelled successfully.');
-    } catch (err) {
-      console.error('Error cancelling appointment:', err);
-      showError(err.message);
-    } finally {
-      hideLoading();
-    }
-  }
-  // Format date for datetime-local input
-  function formatDateTimeForInput(date) {
-    const pad = num => num.toString().padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  }
-
-  // Open modal
-  function openModal() {
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-    const nameInput = getElement('customer-name');
-    if (nameInput) nameInput.focus();
-  }
-
-  // Close modal
-  function closeModal() {
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
-    if (bookingForm) bookingForm.reset();
-    selectedSlot = null;
-  }
-
-  // Show loading indicator
-  function showLoading() {
-    if (loadingIndicator) loadingIndicator.classList.remove('hidden');
-  }
-
-  // Hide loading indicator
-  function hideLoading() {
-    if (loadingIndicator) loadingIndicator.classList.add('hidden');
-  }
-
-  // Show error message
-  function showError(message) {
-    alert(message);
-  }
-
-  // Setup event listeners
-  function setupEventListeners() {
-    if (closeModalBtn) {
-      closeModalBtn.addEventListener('click', closeModal);
-    }
-
-    if (cancelBookingBtn) {
-      cancelBookingBtn.addEventListener('click', closeModal);
-    }
-
-    if (modal) {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-          closeModal();
-        }
+  setupEventListeners() {
+    // Close modal buttons
+    if (this.elements.closeModalBtn) {
+      this.elements.closeModalBtn.addEventListener('click', () => {
+        this.modalManager.close();
       });
     }
 
-    if (bookingForm) {
-      bookingForm.addEventListener('submit', async (e) => {
+    if (this.elements.cancelBookingBtn) {
+      this.elements.cancelBookingBtn.addEventListener('click', () => {
+        this.modalManager.close();
+      });
+    }
+
+    // Form submission
+    if (this.elements.form) {
+      this.elements.form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        await handleBookingSubmit();
+        await this.handleBookingSubmit();
       });
+    }
 
-      // Update end time when service changes
-      serviceSelect.addEventListener('change', function () {
-        const selectedOption = this.options[this.selectedIndex];
-        if (selectedOption.value && selectedOption.dataset.duration) {
-          const duration = parseInt(selectedOption.dataset.duration);
-          const datetimeInput = getElement('appointment-datetime');
-          if (datetimeInput && datetimeInput.value) {
-            const startTime = new Date(datetimeInput.value);
-            const endTime = new Date(startTime.getTime() + duration * 60000);
-            // You could display this to the user if you have an end time display
-          }
+    // Service change - update duration display
+    if (this.elements.serviceSelect) {
+      this.elements.serviceSelect.addEventListener('change', (e) => {
+        const option = e.target.selectedOptions[0];
+        if (option && option.dataset.duration) {
+          this.updateEndTime(parseInt(option.dataset.duration));
         }
       });
     }
   }
 
-  // Handle booking form submission
-  async function handleBookingSubmit() {
-    const nameInput = getElement('customer-name');
-    const emailInput = getElement('customer-email');
-    const phoneInput = getElement('customer-phone');
-    const datetimeInput = getElement('appointment-datetime');
-    const serviceOption = serviceSelect.options[serviceSelect.selectedIndex];
+  updateEndTime(durationMinutes) {
+    const datetime = this.elements.appointmentDatetime.value;
+    if (datetime) {
+      const startTime = new Date(datetime);
+      const endTime = dateUtils.addMinutes(startTime, durationMinutes);
+      
+      // Could display this in the UI if you have an element for it
+      console.log('Appointment will end at:', dateUtils.format(endTime, 'time'));
+    }
+  }
 
-    if (!nameInput || !emailInput || !phoneInput || !serviceSelect || !datetimeInput) {
-      showError('Form elements missing');
+  setupFormValidation() {
+    // Add data-validate attributes
+    if (this.elements.customerEmail) {
+      this.elements.customerEmail.dataset.validate = 'required,email';
+    }
+    if (this.elements.customerPhone) {
+      this.elements.customerPhone.dataset.validate = 'required,phone';
+    }
+
+    // Real-time validation
+    const inputs = this.elements.form.querySelectorAll('input[data-validate]');
+    inputs.forEach(input => {
+      input.addEventListener('blur', () => {
+        const rules = input.dataset.validate.split(',');
+        rules.forEach(rule => {
+          const validator = validators[rule.trim()];
+          if (validator) {
+            const result = validator(input.value);
+            if (!result.valid) {
+              showFieldError(input, result.message);
+            } else {
+              clearFieldError(input);
+            }
+          }
+        });
+      });
+
+      input.addEventListener('input', () => {
+        clearFieldError(input);
+      });
+    });
+  }
+
+  async handleBookingSubmit() {
+    // Validate form
+    const validation = validateForm(this.elements.form);
+    
+    if (!validation.isValid) {
+      toast.error('Please fix the form errors');
       return;
     }
 
+    const serviceOption = this.elements.serviceSelect.selectedOptions[0];
+    
     const formData = {
-      customer_name: nameInput.value.trim(),
-      email: emailInput.value.trim(),
-      cellphone: phoneInput.value.trim(),
-      service_id: serviceSelect.value,
-      service_name: serviceOption.text,
-      start_time: datetimeInput.value
+      customer_name: this.elements.customerName.value.trim(),
+      email: this.elements.customerEmail.value.trim(),
+      cellphone: this.elements.customerPhone.value.trim(),
+      service_id: this.elements.serviceSelect.value,
+      start_time: new Date(this.elements.appointmentDatetime.value).toISOString()
     };
 
-    // Basic client-side validation
-    if (!formData.customer_name || !formData.email || !formData.cellphone || !formData.service_id || !formData.start_time) {
-      showError('Please fill in all required fields');
+    // Additional validation
+    if (!formData.service_id) {
+      toast.error('Please select a service');
       return;
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      showError('Please enter a valid email address');
-      return;
-    }
+    const result = await apiRequest('/api/bookings', {
+      method: 'POST',
+      body: JSON.stringify(formData)
+    });
 
-    // Validate phone format (South African)
-    const phoneRegex = /^0[6-8]\d{8}$/;
-    if (!phoneRegex.test(formData.cellphone)) {
-      showError('Please enter a valid South African cellphone number (e.g., 0821234567)');
-      return;
-    }
-
-    try {
-      showLoading();
-
-      const response = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Booking failed');
-      }
-
-      // Success - refresh calendar and close modal
-      if (calendar) calendar.refetchEvents();
-      closeModal();
-      alert(`✨ Booking confirmed for ${formData.service_name}! ✨\n\nSee you at Sassy Melanin!`);
-    } catch (error) {
-      console.error('Booking error:', error);
-      showError(`Error: ${error.message}`);
-    } finally {
-      hideLoading();
+    if (result.success) {
+      const service = this.state.services.find(s => s.id === formData.service_id);
+      toast.success(
+        `✨ Booking confirmed for ${service?.name || 'your service'}! See you at Sassy De'Beaute!`,
+        5000
+      );
+      
+      this.state.calendar.refetchEvents();
+      this.modalManager.close();
+      this.elements.form.reset();
+    } else {
+      toast.error(result.error || 'Failed to create booking');
     }
   }
+}
 
-  // Start the application
-  init();
-});
+// Service Worker for offline functionality (optional)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    // Uncomment to enable service worker
+    // navigator.serviceWorker.register('/sw.js')
+    //   .then(registration => console.log('SW registered:', registration))
+    //   .catch(error => console.log('SW registration failed:', error));
+  });
+}
