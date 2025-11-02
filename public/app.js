@@ -1,5 +1,5 @@
 // public/app.js
-// Modern Salon Booking Application
+// Modern Salon Booking Application (with staff assignment + fraud guard)
 
 document.addEventListener('DOMContentLoaded', async () => {
   const app = new SalonBookingApp();
@@ -25,7 +25,7 @@ class SalonBookingApp {
     // App state
     this.state = {
       services: [],
-      staff: [],          // 👈 NEW: staff list for allocation
+      staff: [],     // 👈 for assignment
       bookings: [],
       selectedSlot: null,
       calendar: null
@@ -38,24 +38,24 @@ class SalonBookingApp {
     try {
       loading.show('Initializing booking system...');
 
-      // 1. load services
+      // 1. services
       await this.loadServices();
 
-      // 2. load staff (for assignment)
+      // 2. staff (for allocation)
       await this.loadStaff();
 
       // 3. calendar
       this.setupCalendar();
 
-      // 4. events
+      // 4. UI events
       this.setupEventListeners();
 
-      // 5. form validation
+      // 5. validation
       this.setupFormValidation();
 
       toast.success('Booking system ready!');
-    } catch (error) {
-      console.error('Initialization error:', error);
+    } catch (err) {
+      console.error('Initialization error:', err);
       toast.error('Failed to initialize booking system');
     } finally {
       loading.hide();
@@ -142,7 +142,7 @@ class SalonBookingApp {
   }
 
   // ----------------------------------------------------
-  // STAFF (NEW)
+  // STAFF
   // ----------------------------------------------------
   async loadStaff() {
     try {
@@ -224,7 +224,6 @@ class SalonBookingApp {
           const service = this.state.services.find(s => s.id === booking.service_id);
           const status = booking.status || 'BOOKED';
 
-          // colour by status
           let bg = '#9333ea'; // BOOKED
           if (status === 'IN_SESSION') bg = '#f97316';
           if (status === 'COMPLETED_PAID') bg = '#22c55e';
@@ -260,7 +259,6 @@ class SalonBookingApp {
   }
 
   handleDateSelect(selectInfo) {
-    // prevent past
     if (dateUtils.isPast(selectInfo.start)) {
       toast.warning('Cannot book appointments in the past');
       selectInfo.view.calendar.unselect();
@@ -278,7 +276,7 @@ class SalonBookingApp {
   }
 
   // ----------------------------------------------------
-  // EVENT CLICK → actions
+  // EVENT CLICK → actions (with fraud guard)
   // ----------------------------------------------------
   async handleEventClick(clickInfo) {
     const event = clickInfo.event;
@@ -293,25 +291,32 @@ class SalonBookingApp {
       props.employee_name ||
       (props.employee_id ? props.employee_id : 'Unassigned');
 
-    const choice = prompt(
-      [
-        `📅 Booking`,
-        `Service: ${service}`,
-        `Customer: ${customer}`,
-        `Employee: ${currentEmployee}`,
-        `Price: ${price}`,
-        `Time: ${time}`,
-        `Current status: ${currentStatus}`,
-        '',
-        'Choose action:',
-        '1 = Mark IN_SESSION',
-        '2 = Mark COMPLETED_PAID',
-        '3 = Cancel booking',
-        '4 = Assign / change employee',
-        '5 = Unassign employee',
-        '0 = Do nothing'
-      ].join('\n')
-    );
+    // only allow assignment / unassignment when still BOOKED
+    const canChangeStaff = currentStatus === 'BOOKED';
+
+    const lines = [
+      `📅 Booking`,
+      `Service: ${service}`,
+      `Customer: ${customer}`,
+      `Employee: ${currentEmployee}`,
+      `Price: ${price}`,
+      `Time: ${time}`,
+      `Current status: ${currentStatus}`,
+      '',
+      'Choose action:',
+      '1 = Mark IN_SESSION',
+      '2 = Mark COMPLETED_PAID',
+      '3 = Cancel booking'
+    ];
+
+    if (canChangeStaff) {
+      lines.push('4 = Assign / change employee');
+      lines.push('5 = Unassign employee');
+    }
+
+    lines.push('0 = Do nothing');
+
+    const choice = prompt(lines.join('\n'));
 
     switch (choice) {
       case '1':
@@ -324,13 +329,20 @@ class SalonBookingApp {
         await this.cancelBooking(event.id);
         break;
       case '4':
-        await this.assignBookingToStaff(event.id);
+        if (canChangeStaff) {
+          await this.assignBookingToStaff(event.id);
+        } else {
+          toast.error('Cannot reassign once booking is IN_SESSION or COMPLETED_PAID.');
+        }
         break;
       case '5':
-        await this.unassignBooking(event.id);
+        if (canChangeStaff) {
+          await this.unassignBooking(event.id);
+        } else {
+          toast.error('Cannot unassign once booking is IN_SESSION or COMPLETED_PAID.');
+        }
         break;
       default:
-        // nothing
         break;
     }
   }
@@ -352,26 +364,28 @@ class SalonBookingApp {
     }
   }
 
-  // allocate / change employee
+  // allocate / change employee – with second guard
   async assignBookingToStaff(bookingId) {
+    // second guard: read from calendar to be sure
+    const evt = this.state.calendar.getEventById(bookingId);
+    const status = evt?.extendedProps?.status || 'BOOKED';
+    if (status !== 'BOOKED') {
+      toast.error('Cannot assign a booking that is already IN_SESSION or COMPLETED_PAID.');
+      return;
+    }
+
     if (!this.state.staff || this.state.staff.length === 0) {
       toast.error('No staff loaded. Add staff via /api/staff first.');
       return;
     }
 
-    // build quick picker
     const lines = this.state.staff.map((s, idx) => {
       const name = s.full_name || s.name || s.display_name || s.id;
       return `${idx + 1}. ${name} (${s.id})`;
     });
 
     const which = prompt(
-      [
-        'Select staff number to assign:',
-        ...lines,
-        '',
-        '0 = cancel'
-      ].join('\n')
+      ['Select staff number to assign:', ...lines, '', '0 = cancel'].join('\n')
     );
 
     if (!which || which === '0') return;
@@ -401,8 +415,15 @@ class SalonBookingApp {
     }
   }
 
-  // unassign
+  // unassign – with second guard
   async unassignBooking(bookingId) {
+    const evt = this.state.calendar.getEventById(bookingId);
+    const status = evt?.extendedProps?.status || 'BOOKED';
+    if (status !== 'BOOKED') {
+      toast.error('Cannot unassign a booking that is already IN_SESSION or COMPLETED_PAID.');
+      return;
+    }
+
     const result = await apiRequest(`/api/bookings?id=${bookingId}`, {
       method: 'PATCH',
       body: JSON.stringify({ employee_id: '' })
@@ -549,6 +570,6 @@ class SalonBookingApp {
 // Service Worker (optional)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // navigator.serviceWorker.register('/sw.js');
+    // navigator.serviceWorker.register('/sw.js')
   });
 }
