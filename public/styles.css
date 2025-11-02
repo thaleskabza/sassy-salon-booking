@@ -816,10 +816,177 @@
   }
   
   /* ============================================
-     Responsive Design
+     Responsive Design - Mobile First Approach
      ============================================ */
   
-  @media (max-width: 768px) {
+  /* ===== Extra Small Devices (Small Phones, 320px - 480px) ===== */
+  @media (max-width: 480px) {
+    :root {
+      --text-xs: 0.7rem;
+      --text-sm: 0.8rem;
+      --text-base: 0.9rem;
+      --text-lg: 1rem;
+      --text-xl: 1.1rem;
+      --text-2xl: 1.3rem;
+      --text-3xl: 1.6rem;
+      --text-4xl: 1.9rem;
+      --space-4: 0.75rem;
+      --space-6: 1rem;
+      --space-8: 1.25rem;
+      --space-12: 2rem;
+    }
+  
+    .container {
+      padding: 0 var(--space-4);
+    }
+  
+    .salon-header {
+      padding: var(--space-8) 0 var(--space-10);
+      margin-bottom: var(--space-8);
+    }
+  
+    .salon-logo {
+      font-size: 1.8rem;
+      margin-bottom: var(--space-2);
+    }
+  
+    .salon-tagline {
+      font-size: 0.75rem;
+      letter-spacing: 0.03em;
+    }
+  
+    .nav-links {
+      position: static;
+      justify-content: center;
+      margin-top: var(--space-4);
+      gap: var(--space-2);
+      flex-direction: column;
+      align-items: center;
+    }
+  
+    .dashboard-link {
+      padding: var(--space-2) var(--space-4);
+      font-size: 0.75rem;
+      width: 100%;
+      max-width: 200px;
+      justify-content: center;
+    }
+  
+    .section-title {
+      font-size: 1.4rem;
+      margin-bottom: var(--space-4);
+    }
+  
+    .calendar-section {
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-6);
+    }
+  
+    .fc-header-toolbar {
+      flex-direction: column;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+    }
+  
+    .fc-toolbar-chunk {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+  
+    .fc-toolbar-title {
+      font-size: 1rem;
+      text-align: center;
+    }
+  
+    .fc-button {
+      padding: 0.4rem 0.7rem !important;
+      font-size: 0.75rem !important;
+    }
+  
+    .fc-daygrid-day-number {
+      font-size: 0.75rem;
+    }
+  
+    .modal-content {
+      width: 95%;
+      padding: 1.25rem;
+      border-radius: var(--radius-lg);
+      max-height: 85vh;
+    }
+  
+    .modal-header h2 {
+      font-size: var(--text-2xl);
+      padding-right: var(--space-6);
+    }
+  
+    .modal-subtitle {
+      font-size: var(--text-sm);
+    }
+  
+    .close-button {
+      width: 32px;
+      height: 32px;
+      top: var(--space-3);
+      right: var(--space-3);
+    }
+  
+    .form-group {
+      margin-bottom: var(--space-4);
+    }
+  
+    .form-group label {
+      font-size: 0.8rem;
+      margin-bottom: var(--space-1);
+    }
+  
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      padding: var(--space-2) var(--space-3);
+      font-size: 0.9rem;
+    }
+  
+    .btn {
+      padding: 0.65rem 1rem;
+      font-size: 0.85rem;
+      gap: var(--space-1);
+    }
+  
+    .btn svg {
+      width: 16px;
+      height: 16px;
+    }
+  
+    .form-actions {
+      flex-direction: column;
+      gap: var(--space-2);
+      margin-top: var(--space-6);
+    }
+  
+    .salon-footer {
+      padding: var(--space-8) 0 var(--space-6);
+      margin-top: var(--space-10);
+    }
+  
+    .social-links a {
+      width: 36px;
+      height: 36px;
+    }
+  }
+  
+  /* ===== Small Devices (Phones, 481px - 768px) ===== */
+  @media (min-width: 481px) and (max-width: 768px) {
+    .container {
+      padding: 0 var(--space-5);
+    }
+  
+    .salon-header {
+      padding: var(--space-10) 0 var(--space-12);
+      margin-bottom: var(--space-10);
+    }
+  
     .salon-logo {
       font-size: 2.5rem;
     }
@@ -828,41 +995,517 @@
       font-size: 1rem;
     }
   
+    .nav-links {
+      position: static;
+      justify-content: center;
+      margin-top: var(--space-5);
+      gap: var(--space-2);
+    }
+  
+    .dashboard-link {
+      padding: var(--space-2) var(--space-5);
+      font-size: 0.85rem;
+    }
+  
+    .section-title {
+      font-size: 1.6rem;
+    }
+  
     .calendar-section {
       padding: 1.5rem;
     }
   
+    .fc-toolbar-title {
+      font-size: 1.2rem;
+    }
+  
     .modal-content {
-      padding: 1.5rem;
+      width: 92%;
+      max-width: 500px;
+      padding: 1.75rem;
     }
   
     .form-actions {
       flex-direction: column;
-    }
-  
-    .nav-links {
-      position: static;
-      justify-content: center;
-      margin-top: 1.5rem;
+      gap: var(--space-3);
     }
   }
   
-  @media (max-width: 480px) {
+  /* ===== Medium Devices (Tablets, 769px - 1024px) ===== */
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .container {
+      max-width: 960px;
+      padding: 0 var(--space-6);
+    }
+  
+    .salon-header {
+      padding: var(--space-12) 0 var(--space-16);
+    }
+  
     .salon-logo {
-      font-size: 2rem;
+      font-size: 3.2rem;
     }
   
-    .section-title {
-      font-size: 1.5rem;
-    }
-  
-    .fc-toolbar-title {
+    .salon-tagline {
       font-size: 1.1rem;
     }
   
+    .nav-links {
+      top: var(--space-6);
+      right: var(--space-6);
+      gap: var(--space-3);
+    }
+  
+    .dashboard-link {
+      padding: var(--space-3) var(--space-5);
+      font-size: 0.9rem;
+    }
+  
+    .section-title {
+      font-size: 1.75rem;
+    }
+  
+    .calendar-section {
+      padding: 2rem;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  
+    .modal-content {
+      max-width: 580px;
+    }
+  
+    .form-actions {
+      flex-direction: row;
+    }
+  }
+  
+  /* ===== Large Devices (Desktops, 1025px - 1440px) ===== */
+  @media (min-width: 1025px) and (max-width: 1440px) {
+    .container {
+      max-width: 1200px;
+      padding: 0 var(--space-8);
+    }
+  
+    .salon-header {
+      padding: var(--space-16) 0 4rem;
+    }
+  
+    .salon-logo {
+      font-size: 3.5rem;
+    }
+  
+    .salon-tagline {
+      font-size: 1.25rem;
+    }
+  
+    .nav-links {
+      top: var(--space-8);
+      right: var(--space-10);
+      gap: var(--space-4);
+    }
+  
+    .dashboard-link {
+      padding: var(--space-3) var(--space-6);
+      font-size: var(--text-base);
+    }
+  
+    .section-title {
+      font-size: 2rem;
+    }
+  
+    .calendar-section {
+      padding: 2.5rem;
+      max-width: 1100px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  
+    .modal-content {
+      max-width: 600px;
+      padding: var(--space-10);
+    }
+  
+    .fc-toolbar-title {
+      font-size: 1.5rem;
+    }
+  
+    .fc-button {
+      padding: 0.6rem 1rem !important;
+      font-size: 0.95rem !important;
+    }
+  }
+  
+  /* ===== Extra Large Devices (Large Desktops, 1441px - 1920px) ===== */
+  @media (min-width: 1441px) and (max-width: 1920px) {
+    :root {
+      --text-base: 1.05rem;
+      --text-lg: 1.2rem;
+      --text-xl: 1.35rem;
+      --text-2xl: 1.65rem;
+      --text-3xl: 2rem;
+      --text-4xl: 2.5rem;
+      --text-5xl: 3.25rem;
+    }
+  
+    .container {
+      max-width: 1400px;
+      padding: 0 var(--space-10);
+    }
+  
+    .salon-header {
+      padding: 5rem 0;
+      margin-bottom: 4rem;
+    }
+  
+    .salon-logo {
+      font-size: 4.5rem;
+      margin-bottom: var(--space-4);
+    }
+  
+    .salon-tagline {
+      font-size: 1.4rem;
+      letter-spacing: 0.08em;
+    }
+  
+    .nav-links {
+      top: var(--space-10);
+      right: var(--space-12);
+      gap: var(--space-5);
+    }
+  
+    .dashboard-link {
+      padding: var(--space-4) var(--space-8);
+      font-size: 1.05rem;
+    }
+  
+    .section-title {
+      font-size: 2.25rem;
+      margin-bottom: 2rem;
+    }
+  
+    .calendar-section {
+      padding: 3rem;
+      max-width: 1300px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  
+    #calendar {
+      max-width: 1200px;
+    }
+  
+    .fc-toolbar-title {
+      font-size: 1.7rem;
+    }
+  
+    .fc-button {
+      padding: 0.7rem 1.2rem !important;
+      font-size: 1rem !important;
+    }
+  
+    .fc-daygrid-day-number,
+    .fc-col-header-cell-cushion {
+      font-size: 1rem;
+    }
+  
+    .modal-content {
+      max-width: 680px;
+      padding: 3rem;
+    }
+  
+    .modal-header h2 {
+      font-size: 2.25rem;
+    }
+  
+    .form-group label {
+      font-size: 1rem;
+      margin-bottom: var(--space-3);
+    }
+  
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      padding: var(--space-4) var(--space-5);
+      font-size: 1.05rem;
+    }
+  
     .btn {
-      padding: 0.7rem 1rem;
-      font-size: 0.8rem;
+      padding: var(--space-4) var(--space-8);
+      font-size: 1.05rem;
+    }
+  
+    .btn svg {
+      width: 22px;
+      height: 22px;
+    }
+  
+    .salon-footer {
+      padding: 4rem 0 var(--space-10);
+      font-size: 1rem;
+    }
+  
+    .social-links a {
+      width: 48px;
+      height: 48px;
+    }
+  }
+  
+  /* ===== Ultra Large Screens (TVs & Ultra-Wide, 1921px+) ===== */
+  @media (min-width: 1921px) {
+    :root {
+      font-size: 18px;
+      --text-base: 1.1rem;
+      --text-lg: 1.3rem;
+      --text-xl: 1.5rem;
+      --text-2xl: 1.8rem;
+      --text-3xl: 2.2rem;
+      --text-4xl: 2.75rem;
+      --text-5xl: 3.5rem;
+    }
+  
+    .container {
+      max-width: 1800px;
+      padding: 0 4rem;
+    }
+  
+    .salon-header {
+      padding: 6rem 0;
+      margin-bottom: 5rem;
+    }
+  
+    .salon-logo {
+      font-size: 5.5rem;
+      margin-bottom: var(--space-5);
+      text-shadow: 0 4px 30px rgba(222, 61, 122, 0.4);
+    }
+  
+    .salon-tagline {
+      font-size: 1.6rem;
+      letter-spacing: 0.1em;
+    }
+  
+    .nav-links {
+      top: 3rem;
+      right: 4rem;
+      gap: 2rem;
+    }
+  
+    .dashboard-link {
+      padding: 1rem 2rem;
+      font-size: 1.2rem;
+      border-radius: 50px;
+    }
+  
+    .section-title {
+      font-size: 2.75rem;
+      margin-bottom: 2.5rem;
+    }
+  
+    .calendar-section {
+      padding: 4rem;
+      max-width: 1600px;
+      margin-left: auto;
+      margin-right: auto;
+      box-shadow: 0 15px 35px rgba(247, 100, 159, 0.15);
+    }
+  
+    #calendar {
+      max-width: 1500px;
+    }
+  
+    .fc-header-toolbar {
+      margin-bottom: 2.5rem;
+    }
+  
+    .fc-toolbar-title {
+      font-size: 2rem;
+    }
+  
+    .fc-button {
+      padding: 0.9rem 1.5rem !important;
+      font-size: 1.15rem !important;
+    }
+  
+    .fc-daygrid-day-number,
+    .fc-col-header-cell-cushion {
+      font-size: 1.15rem;
+      padding: 0.8rem;
+    }
+  
+    .fc-daygrid-day-frame {
+      min-height: 100px;
+    }
+  
+    .fc-event {
+      padding: 6px 10px;
+      font-size: 1rem;
+    }
+  
+    .modal-content {
+      max-width: 800px;
+      padding: 4rem;
+      border-radius: var(--radius-2xl);
+    }
+  
+    .close-button {
+      width: 48px;
+      height: 48px;
+      top: var(--space-6);
+      right: var(--space-6);
+    }
+  
+    .close-button svg {
+      width: 26px;
+      height: 26px;
+    }
+  
+    .modal-header h2 {
+      font-size: 2.75rem;
+      margin-bottom: var(--space-4);
+    }
+  
+    .modal-subtitle {
+      font-size: 1.15rem;
+    }
+  
+    .form-group {
+      margin-bottom: 2rem;
+    }
+  
+    .form-group label {
+      font-size: 1.1rem;
+      margin-bottom: var(--space-4);
+    }
+  
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      padding: 1rem 1.25rem;
+      font-size: 1.1rem;
+      border-radius: var(--radius-xl);
+    }
+  
+    .form-group textarea {
+      min-height: 140px;
+    }
+  
+    .btn {
+      padding: 1rem 2.5rem;
+      font-size: 1.15rem;
+      border-radius: var(--radius-xl);
+    }
+  
+    .btn svg {
+      width: 26px;
+      height: 26px;
+    }
+  
+    .form-actions {
+      margin-top: 3rem;
+      gap: 1.5rem;
+    }
+  
+    .salon-footer {
+      padding: 5rem 0 3rem;
+      font-size: 1.1rem;
+      margin-top: 6rem;
+    }
+  
+    .salon-footer p {
+      margin-bottom: var(--space-5);
+    }
+  
+    .social-links {
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+  
+    .social-links a {
+      width: 56px;
+      height: 56px;
+    }
+  
+    .social-links a svg {
+      width: 28px;
+      height: 28px;
+    }
+  
+    .spinner {
+      width: 70px;
+      height: 70px;
+    }
+  
+    .loading p {
+      font-size: 1.2rem;
+    }
+  }
+  
+  /* ===== Landscape Orientation Optimizations ===== */
+  @media (max-height: 600px) and (orientation: landscape) {
+    .salon-header {
+      padding: var(--space-6) 0 var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+  
+    .salon-logo {
+      font-size: 2rem;
+      margin-bottom: var(--space-2);
+    }
+  
+    .salon-tagline {
+      font-size: 0.9rem;
+    }
+  
+    .modal-content {
+      max-height: 95vh;
+      padding: 1.5rem;
+    }
+  
+    .form-group {
+      margin-bottom: var(--space-4);
+    }
+  }
+  
+  /* ===== Touch Device Optimizations ===== */
+  @media (hover: none) and (pointer: coarse) {
+    .btn,
+    .dashboard-link,
+    .close-button,
+    .social-links a {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      font-size: 16px; /* Prevents zoom on iOS */
+    }
+  }
+  
+  /* ===== High DPI / Retina Displays ===== */
+  @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    body {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+  
+    .salon-logo {
+      text-rendering: optimizeLegibility;
+    }
+  }
+  
+  /* ===== Reduced Motion Preference ===== */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
   
@@ -964,4 +1607,3 @@
       display: none !important;
     }
   }
-  
