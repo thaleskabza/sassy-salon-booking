@@ -12,7 +12,6 @@ function getPeriodFromDate(dateStr) {
   return `${y}-${m}-${half}`;
 }
 
-// fetch service to get price/duration
 async function getServiceById(serviceId) {
   if (!serviceId) return null;
   const svc = await redis.hGetAll(`service:${serviceId}`);
@@ -24,7 +23,6 @@ async function getServiceById(serviceId) {
   };
 }
 
-// fetch staff to get commission rate
 async function getStaffById(staffId) {
   if (!staffId) return null;
   const st = await redis.hGetAll(`staff:${staffId}`);
@@ -47,6 +45,11 @@ async function createSaleFromBooking(booking) {
     price: bookingPrice
   } = booking;
 
+  // if there is no employee, do NOT create a sale
+  if (!employee_id) {
+    return;
+  }
+
   // get price
   let amount = bookingPrice ? Number(bookingPrice) : 0;
   if (!amount && service_id) {
@@ -56,17 +59,14 @@ async function createSaleFromBooking(booking) {
     }
   }
 
-  // if still 0, just don't create a sale
   if (!amount) return;
 
   // staff / commission
   let commission_amount = 0;
-  let staffId = employee_id;
-  if (staffId) {
-    const staff = await getStaffById(staffId);
-    if (staff && staff.commission_rate) {
-      commission_amount = Math.round((amount * staff.commission_rate) / 100);
-    }
+  const staff = await getStaffById(employee_id);
+  if (staff && staff.commission_rate) {
+    // staff.commission_rate is stored as PERCENT (e.g. 30)
+    commission_amount = Math.round((amount * staff.commission_rate) / 100);
   }
 
   const saleId = `sale-${nanoid(6)}`;
@@ -74,12 +74,11 @@ async function createSaleFromBooking(booking) {
   const createdAt = new Date().toISOString();
   const period = getPeriodFromDate(start_time || createdAt);
 
-  // write sale
   await redis.hSet(key, {
     id: saleId,
     booking_id: bookingId,
-    employee_id: employee_id || '',
-    employee_name: employee_name || '',
+    employee_id: employee_id,
+    employee_name: employee_name || (staff ? staff.full_name : ''),
     service_id: service_id || '',
     amount: String(amount),
     commission_amount: String(commission_amount),
@@ -87,12 +86,9 @@ async function createSaleFromBooking(booking) {
     period
   });
 
-  // indexes
-  await redis.sAdd('sales:all', key);                      // global
-  await redis.sAdd(`sales:${period}`, key);                // per period
-  if (employee_id) {
-    await redis.sAdd(`sales:${employee_id}:${period}`, key); // per staff + period
-  }
+  await redis.sAdd('sales:all', key);
+  await redis.sAdd(`sales:${period}`, key);
+  await redis.sAdd(`sales:${employee_id}:${period}`, key);
 }
 
 // list bookings (optionally by date)
@@ -117,7 +113,7 @@ async function listBookings(from, to) {
 }
 
 export default async function handler(req, res) {
-  // GET /api/bookings?from=&to=
+  // GET /api/bookings
   if (req.method === 'GET') {
     try {
       const { from, to } = req.query;
@@ -149,7 +145,6 @@ export default async function handler(req, res) {
       const id = nanoid(21);
       const key = `booking:${id}`;
 
-      // prefer service price
       let price = 0;
       const svc = await getServiceById(service_id);
       if (svc && svc.price) {
@@ -170,6 +165,7 @@ export default async function handler(req, res) {
           : start_time,
         status: 'BOOKED',
         reference: `SM-${nanoid(6).toUpperCase()}`,
+        // allow creating unallocated bookings
         employee_id: employee_id || '',
         employee_name: employee_name || '',
         price: String(price),
@@ -207,33 +203,39 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: 'Booking not found' });
       }
 
-      const { status, employee_id, employee_name } = req.body || {};
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+      const { status } = body;
 
-      // build update payload
       const update = {};
 
+      // 1) status change
       if (status) {
         update.status = status;
       }
-      if (employee_id) {
-        update.employee_id = employee_id;
-      }
-      if (employee_name) {
-        update.employee_name = employee_name;
+
+      // 2) ASSIGN / UNASSIGN EMPLOYEE
+      // we must not use "if (body.employee_id)" because "" is a valid intention to CLEAR
+      if (Object.prototype.hasOwnProperty.call(body, 'employee_id')) {
+        update.employee_id = body.employee_id || '';  // allow ''
+        // if we unassign, also clear the name
+        if (!body.employee_id) {
+          update.employee_name = '';
+        }
       }
 
-      // write changes
+      // optionally update name
+      if (Object.prototype.hasOwnProperty.call(body, 'employee_name')) {
+        update.employee_name = body.employee_name || '';
+      }
+
+      // apply updates
       if (Object.keys(update).length > 0) {
         await redis.hSet(key, update);
       }
 
-      // if status → COMPLETED_PAID and wasn't previously
+      // if going to COMPLETED_PAID now → create sale (only if employee_id present after update)
       if (status === 'COMPLETED_PAID' && existing.status !== 'COMPLETED_PAID') {
-        // re-read booking to get merged view
-        const fresh = {
-          ...existing,
-          ...update
-        };
+        const fresh = { ...existing, ...update };
         await createSaleFromBooking(fresh);
       }
 
@@ -256,7 +258,7 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: 'Booking not found' });
       }
 
-      // soft delete → mark as CANCELLED
+      // soft delete
       await redis.hSet(key, { status: 'CANCELLED' });
 
       return res.status(200).json({ success: true });
