@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 class SalonBookingApp {
   constructor() {
+    // DOM refs
     this.elements = {
       calendar: document.getElementById('calendar'),
       modal: document.getElementById('booking-modal'),
@@ -21,8 +22,10 @@ class SalonBookingApp {
       cancelBookingBtn: document.getElementById('cancel-booking')
     };
 
+    // App state
     this.state = {
       services: [],
+      staff: [],          // 👈 NEW: staff list for allocation
       bookings: [],
       selectedSlot: null,
       calendar: null
@@ -35,9 +38,19 @@ class SalonBookingApp {
     try {
       loading.show('Initializing booking system...');
 
+      // 1. load services
       await this.loadServices();
+
+      // 2. load staff (for assignment)
+      await this.loadStaff();
+
+      // 3. calendar
       this.setupCalendar();
+
+      // 4. events
       this.setupEventListeners();
+
+      // 5. form validation
       this.setupFormValidation();
 
       toast.success('Booking system ready!');
@@ -49,6 +62,9 @@ class SalonBookingApp {
     }
   }
 
+  // ----------------------------------------------------
+  // SERVICES
+  // ----------------------------------------------------
   async loadServices() {
     const result = await apiRequest('/api/services');
 
@@ -125,6 +141,28 @@ class SalonBookingApp {
     });
   }
 
+  // ----------------------------------------------------
+  // STAFF (NEW)
+  // ----------------------------------------------------
+  async loadStaff() {
+    try {
+      const res = await fetch('/api/staff');
+      if (!res.ok) {
+        console.warn('Could not load staff from /api/staff');
+        this.state.staff = [];
+        return;
+      }
+      const staff = await res.json();
+      this.state.staff = Array.isArray(staff) ? staff : [];
+    } catch (err) {
+      console.error('Error loading staff', err);
+      this.state.staff = [];
+    }
+  }
+
+  // ----------------------------------------------------
+  // CALENDAR
+  // ----------------------------------------------------
   setupCalendar() {
     if (!window.FullCalendar) {
       throw new Error('FullCalendar library not loaded');
@@ -186,9 +224,11 @@ class SalonBookingApp {
           const service = this.state.services.find(s => s.id === booking.service_id);
           const status = booking.status || 'BOOKED';
 
+          // colour by status
           let bg = '#9333ea'; // BOOKED
           if (status === 'IN_SESSION') bg = '#f97316';
           if (status === 'COMPLETED_PAID') bg = '#22c55e';
+          if (status === 'CANCELLED') bg = '#9ca3af';
 
           return {
             id: booking.id,
@@ -203,8 +243,8 @@ class SalonBookingApp {
               price: booking.price ?? service?.price ?? 0,
               reference: booking.reference,
               status,
-              employee_id: booking.employee_id,
-              employee_name: booking.employee_name
+              employee_id: booking.employee_id || '',
+              employee_name: booking.employee_name || ''
             }
           };
         });
@@ -220,6 +260,7 @@ class SalonBookingApp {
   }
 
   handleDateSelect(selectInfo) {
+    // prevent past
     if (dateUtils.isPast(selectInfo.start)) {
       toast.warning('Cannot book appointments in the past');
       selectInfo.view.calendar.unselect();
@@ -236,7 +277,9 @@ class SalonBookingApp {
     selectInfo.view.calendar.unselect();
   }
 
-  // EVENT CLICK → show actions
+  // ----------------------------------------------------
+  // EVENT CLICK → actions
+  // ----------------------------------------------------
   async handleEventClick(clickInfo) {
     const event = clickInfo.event;
     const props = event.extendedProps;
@@ -246,13 +289,16 @@ class SalonBookingApp {
     const price = formatCurrency(props.price || 0);
     const time = dateUtils.format(event.start, 'full');
     const currentStatus = props.status || 'BOOKED';
+    const currentEmployee =
+      props.employee_name ||
+      (props.employee_id ? props.employee_id : 'Unassigned');
 
     const choice = prompt(
       [
         `📅 Booking`,
         `Service: ${service}`,
         `Customer: ${customer}`,
-        `Employee: ${props.employee_name || 'Unassigned'}`,
+        `Employee: ${currentEmployee}`,
         `Price: ${price}`,
         `Time: ${time}`,
         `Current status: ${currentStatus}`,
@@ -261,6 +307,8 @@ class SalonBookingApp {
         '1 = Mark IN_SESSION',
         '2 = Mark COMPLETED_PAID',
         '3 = Cancel booking',
+        '4 = Assign / change employee',
+        '5 = Unassign employee',
         '0 = Do nothing'
       ].join('\n')
     );
@@ -275,11 +323,21 @@ class SalonBookingApp {
       case '3':
         await this.cancelBooking(event.id);
         break;
+      case '4':
+        await this.assignBookingToStaff(event.id);
+        break;
+      case '5':
+        await this.unassignBooking(event.id);
+        break;
       default:
+        // nothing
         break;
     }
   }
 
+  // ----------------------------------------------------
+  // PATCH HELPERS
+  // ----------------------------------------------------
   async updateBookingStatus(bookingId, status) {
     const result = await apiRequest(`/api/bookings?id=${bookingId}`, {
       method: 'PATCH',
@@ -291,6 +349,70 @@ class SalonBookingApp {
       this.state.calendar.refetchEvents();
     } else {
       toast.error(result.error || 'Failed to update booking');
+    }
+  }
+
+  // allocate / change employee
+  async assignBookingToStaff(bookingId) {
+    if (!this.state.staff || this.state.staff.length === 0) {
+      toast.error('No staff loaded. Add staff via /api/staff first.');
+      return;
+    }
+
+    // build quick picker
+    const lines = this.state.staff.map((s, idx) => {
+      const name = s.full_name || s.name || s.display_name || s.id;
+      return `${idx + 1}. ${name} (${s.id})`;
+    });
+
+    const which = prompt(
+      [
+        'Select staff number to assign:',
+        ...lines,
+        '',
+        '0 = cancel'
+      ].join('\n')
+    );
+
+    if (!which || which === '0') return;
+
+    const index = Number(which) - 1;
+    const staff = this.state.staff[index];
+    if (!staff) {
+      toast.error('Invalid staff selection');
+      return;
+    }
+
+    const payload = {
+      employee_id: staff.id,
+      employee_name: staff.full_name || staff.name || staff.display_name || staff.id
+    };
+
+    const result = await apiRequest(`/api/bookings?id=${bookingId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+
+    if (result.success) {
+      toast.success(`Booking assigned to ${payload.employee_name}`);
+      this.state.calendar.refetchEvents();
+    } else {
+      toast.error(result.error || 'Failed to assign booking');
+    }
+  }
+
+  // unassign
+  async unassignBooking(bookingId) {
+    const result = await apiRequest(`/api/bookings?id=${bookingId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ employee_id: '' })
+    });
+
+    if (result.success) {
+      toast.success('Booking unassigned');
+      this.state.calendar.refetchEvents();
+    } else {
+      toast.error(result.error || 'Failed to unassign booking');
     }
   }
 
@@ -307,7 +429,11 @@ class SalonBookingApp {
     }
   }
 
+  // ----------------------------------------------------
+  // UI / FORM
+  // ----------------------------------------------------
   setupEventListeners() {
+    // close modal
     if (this.elements.closeModalBtn) {
       this.elements.closeModalBtn.addEventListener('click', () => {
         this.modalManager.close();
@@ -320,6 +446,7 @@ class SalonBookingApp {
       });
     }
 
+    // submit
     if (this.elements.form) {
       this.elements.form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -327,6 +454,7 @@ class SalonBookingApp {
       });
     }
 
+    // service change
     if (this.elements.serviceSelect) {
       this.elements.serviceSelect.addEventListener('change', (e) => {
         const option = e.target.selectedOptions[0];
