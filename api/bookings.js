@@ -8,7 +8,7 @@ function getPeriodFromDate(dateStr) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = d.getDate();
-  const half = day <= 15 ? '1' : '2';
+  const half = day <= 15 ? '1' : '3';
   return `${y}-${m}-${half}`;
 }
 
