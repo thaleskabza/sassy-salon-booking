@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // parallel commission calls
     const rows = await Promise.all(
       staff.map(async (s) => {
-        const calcRes = await fetch(`/api/commission-calc?staff_id=${s.id}&period=${period}`);
+        const calcRes = await fetch(`/api/commission-calc?staff_id=${s.id}&period=${period}`, { headers: { ...AuthClient.authHeaders() } });
         if (!calcRes.ok) {
           return {
             staff_id: s.id,
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function fetchStaff() {
-    const res = await fetch('/api/staff');
+    const res = await fetch('/api/staff', { headers: { ...AuthClient.authHeaders() } });
     if (!res.ok) return [];
     return res.json();
   }

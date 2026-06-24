@@ -1,8 +1,17 @@
 // api/commission-overrides.js
 import redis from './_redis.js';
 import { nanoid } from 'nanoid';
+import { requireAuth, requireSubscription, tk } from './_middleware.js';
 
 export default async function handler(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+
+  const ok = await requireSubscription(res, auth.tenantId);
+  if (!ok) return;
+
+  const { tenantId } = auth;
+
   if (req.method === 'POST') {
     try {
       const { staff_id, period, override_amount, reason = '', created_by = 'system' } = req.body;
@@ -10,7 +19,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'staff_id and period required' });
       }
 
-      const key = `commission-override:${staff_id}:${period}`;
+      const key = tk(tenantId, `commission-override:${staff_id}:${period}`);
       await redis.hSet(key, {
         id: `covr-${nanoid(6)}`,
         staff_id,
@@ -21,7 +30,7 @@ export default async function handler(req, res) {
         created_at: new Date().toISOString()
       });
 
-      await redis.sAdd(`commission-overrides:${staff_id}`, key);
+      await redis.sAdd(tk(tenantId, `commission-overrides:${staff_id}`), key);
 
       return res.status(201).json({ message: 'saved' });
     } catch (err) {
@@ -33,9 +42,11 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       const { staff_id, period } = req.query;
-      if (!staff_id || !period) return res.status(400).json({ error: 'staff_id and period required' });
+      if (!staff_id || !period) {
+        return res.status(400).json({ error: 'staff_id and period required' });
+      }
 
-      const key = `commission-override:${staff_id}:${period}`;
+      const key = tk(tenantId, `commission-override:${staff_id}:${period}`);
       const data = await redis.hGetAll(key);
       if (!data || !data.staff_id) {
         return res.status(200).json({ override: null });

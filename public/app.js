@@ -146,7 +146,9 @@ class SalonBookingApp {
   // ----------------------------------------------------
   async loadStaff() {
     try {
-      const res = await fetch('/api/staff');
+      const res = await fetch('/api/staff', {
+        headers: { ...AuthClient.authHeaders() }
+      });
       if (!res.ok) {
         console.warn('Could not load staff from /api/staff');
         this.state.staff = [];

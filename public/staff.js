@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const res = await fetch('/api/staff', {
           method,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...AuthClient.authHeaders() },
           body: JSON.stringify(payload)
         });
   
@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadStaff() {
       listContainer.innerHTML = '<p>Loading staff…</p>';
       try {
-        const res = await fetch('/api/staff');
+        const res = await fetch('/api/staff', { headers: { ...AuthClient.authHeaders() } });
         if (!res.ok) {
           listContainer.innerHTML = '<p>Could not load staff.</p>';
           return;
@@ -184,7 +184,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function deleteStaff(id) {
       try {
         const res = await fetch(`/api/staff?id=${encodeURIComponent(id)}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: { ...AuthClient.authHeaders() }
         });
         const json = await res.json().catch(() => ({}));
   

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sassy De'Beaute | Subscribe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+  <link href="styles.css" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💅</text></svg>">
+  <style>
+    body { background: linear-gradient(135deg, #f5f3ff 0%, #fdf2f8 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; }
+    .sub-container { width: 100%; max-width: 560px; }
+    .sub-card { background: white; border-radius: 1.5rem; box-shadow: 0 20px 60px rgba(147,51,234,0.12); overflow: hidden; }
+    .sub-header { background: linear-gradient(135deg, #9333ea, #7e22ce); padding: 2.5rem; text-align: center; color: white; }
+    .sub-header h1 { font-family: 'Playfair Display', serif; font-size: 1.75rem; margin-bottom: 0.25rem; }
+    .sub-header p { opacity: 0.85; font-size: 0.9rem; }
+    .price-tag { display: inline-block; margin-top: 1.5rem; background: rgba(255,255,255,0.15); border-radius: 1rem; padding: 1rem 2rem; }
+    .price-tag .amount { font-size: 2.75rem; font-weight: 700; line-height: 1; }
+    .price-tag .per { font-size: 0.95rem; opacity: 0.75; }
+    .sub-body { padding: 2.5rem; }
+    .feature-list { list-style: none; padding: 0; margin: 0 0 2rem; }
+    .feature-list li { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0; font-size: 0.9375rem; color: #374151; border-bottom: 1px solid #f3f4f6; }
+    .feature-list li:last-child { border-bottom: none; }
+    .feature-list li svg { flex-shrink: 0; color: #9333ea; }
+    .btn-pay { width: 100%; padding: 1rem; background: linear-gradient(135deg, #9333ea, #7e22ce); color: white; border: none; border-radius: 0.875rem; font-size: 1.0625rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.625rem; transition: opacity 0.2s, transform 0.1s; }
+    .btn-pay:hover { opacity: 0.92; transform: translateY(-1px); }
+    .btn-pay:active { transform: translateY(0); }
+    .btn-pay:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .yoco-badge { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 1rem; color: #9ca3af; font-size: 0.8125rem; }
+    .logout-link { display: block; text-align: center; margin-top: 1.5rem; color: #9ca3af; font-size: 0.8125rem; cursor: pointer; text-decoration: none; }
+    .logout-link:hover { color: #6b7280; }
+    .alert { padding: 1rem; border-radius: 0.75rem; font-size: 0.875rem; margin-bottom: 1.5rem; }
+    .alert-success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+    .alert-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 50; align-items: center; justify-content: center; }
+    .loading-overlay.visible { display: flex; }
+    .spinner-box { background: white; border-radius: 1rem; padding: 2rem 3rem; text-align: center; }
+    .spinner-box p { margin-top: 1rem; color: #6b7280; font-size: 0.9rem; }
+    .spin { width: 40px; height: 40px; border: 3px solid #e5e7eb; border-top-color: #9333ea; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #tenant-name { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="spinner-box">
+      <div class="spin"></div>
+      <p>Redirecting to secure payment...</p>
+    </div>
+  </div>
+
+  <div class="sub-container">
+    <!-- Success state (after returning from Yoco) -->
+    <div id="success-state" style="display:none;" class="sub-card">
+      <div class="sub-body" style="text-align:center; padding: 3rem 2.5rem;">
+        <svg width="64" height="64" fill="none" stroke="#16a34a" viewBox="0 0 24 24" style="margin:0 auto 1.5rem;">
+          <circle cx="12" cy="12" r="10" stroke-width="1.5"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        <h2 style="font-family:'Playfair Display',serif; font-size:1.5rem; color:#111827; margin-bottom:0.75rem;">Payment Processing</h2>
+        <p style="color:#6b7280; margin-bottom:2rem;">Your payment is being processed. Your subscription will activate within a few minutes. You can close this page and check back shortly.</p>
+        <button onclick="window.location.href='/index.html'" class="btn-pay" style="margin:0 auto; max-width:240px;">Go to Dashboard</button>
+      </div>
+    </div>
+
+    <!-- Error state (cancelled) -->
+    <div id="cancelled-state" style="display:none;" class="sub-card">
+      <div class="sub-body" style="padding: 2.5rem;">
+        <div class="alert alert-error" style="display:block;">Payment was cancelled. You can try again below.</div>
+      </div>
+    </div>
+
+    <!-- Main subscription card -->
+    <div id="main-state" class="sub-card">
+      <div class="sub-header">
+        <h1>Sassy De'Beaute Suite</h1>
+        <p>Complete salon management for <span id="tenant-name">your salon</span></p>
+
+        <div class="price-tag">
+          <div class="amount">R299</div>
+          <div class="per">per month · cancel anytime</div>
+        </div>
+      </div>
+
+      <div class="sub-body">
+        <div id="alert-area"></div>
+
+        <ul class="feature-list">
+          <li>
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            Appointment booking calendar
+          </li>
+          <li>
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            Staff management &amp; assignment
+          </li>
+          <li>
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            Commission &amp; payroll calculations
+          </li>
+          <li>
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            Revenue reports &amp; KPI dashboard
+          </li>
+          <li>
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            Unlimited bookings &amp; staff members
+          </li>
+          <li>
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            Your data stays completely private
+          </li>
+        </ul>
+
+        <button id="pay-btn" class="btn-pay">
+          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+          </svg>
+          Subscribe with Yoco · R299/month
+        </button>
+
+        <div class="yoco-badge">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          Secured by Yoco · South African payments
+        </div>
+
+        <a class="logout-link" id="logout-link">Sign out</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="auth-client.js"></script>
+  <script>
+    // Check URL params first (Yoco redirect)
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get('success') === 'true') {
+      document.getElementById('main-state').style.display = 'none';
+      document.getElementById('success-state').style.display = 'block';
+    } else if (params.get('cancelled') === 'true') {
+      document.getElementById('cancelled-state').style.display = 'block';
+    }
+
+    // Load tenant info
+    (async () => {
+      if (!AuthClient.isLoggedIn()) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      const tenant = AuthClient.getTenant();
+      if (tenant?.salon_name) {
+        document.getElementById('tenant-name').textContent = tenant.salon_name;
+      }
+
+      // If already subscribed, skip to app (unless showing success state)
+      if (params.get('success') !== 'true') {
+        try {
+          const res = await fetch('/api/subscription?action=status', {
+            headers: AuthClient.authHeaders()
+          });
+          const data = await res.json();
+          if (data.status === 'active') {
+            window.location.href = '/index.html';
+          }
+        } catch { /* ignore network errors */ }
+      }
+    })();
+
+    // Pay button
+    document.getElementById('pay-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('pay-btn');
+      const alertArea = document.getElementById('alert-area');
+
+      alertArea.innerHTML = '';
+      btn.disabled = true;
+      btn.innerHTML = `<div style="width:20px;height:20px;border:2px solid rgba(255,255,255,0.4);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite"></div> Processing...`;
+
+      document.getElementById('loading-overlay').classList.add('visible');
+
+      try {
+        const res = await fetch('/api/subscription?action=checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...AuthClient.authHeaders() }
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Payment setup failed');
+        }
+
+        // Redirect to Yoco checkout
+        window.location.href = data.checkoutUrl;
+      } catch (err) {
+        document.getElementById('loading-overlay').classList.remove('visible');
+        alertArea.innerHTML = `<div class="alert alert-error" style="display:block;">${err.message}</div>`;
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg> Subscribe with Yoco · R299/month`;
+      }
+    });
+
+    document.getElementById('logout-link').addEventListener('click', () => {
+      AuthClient.logout();
+    });
+  </script>
+</body>
+</html>
