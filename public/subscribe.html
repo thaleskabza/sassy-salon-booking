@@ -27,7 +27,7 @@
     .btn-pay:hover { opacity: 0.92; transform: translateY(-1px); }
     .btn-pay:active { transform: translateY(0); }
     .btn-pay:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-    .yoco-badge { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 1rem; color: #9ca3af; font-size: 0.8125rem; }
+    .stitch-badge { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 1rem; color: #9ca3af; font-size: 0.8125rem; }
     .logout-link { display: block; text-align: center; margin-top: 1.5rem; color: #9ca3af; font-size: 0.8125rem; cursor: pointer; text-decoration: none; }
     .logout-link:hover { color: #6b7280; }
     .alert { padding: 1rem; border-radius: 0.75rem; font-size: 0.875rem; margin-bottom: 1.5rem; }
@@ -51,7 +51,7 @@
   </div>
 
   <div class="sub-container">
-    <!-- Success state (after returning from Yoco) -->
+    <!-- Success state (after returning from Stitch) -->
     <div id="success-state" style="display:none;" class="sub-card">
       <div class="sub-body" style="text-align:center; padding: 3rem 2.5rem;">
         <svg width="64" height="64" fill="none" stroke="#16a34a" viewBox="0 0 24 24" style="margin:0 auto 1.5rem;">
@@ -117,14 +117,14 @@
           <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
           </svg>
-          Subscribe with Yoco · R299/month
+          Subscribe with Stitch · R299/month
         </button>
 
-        <div class="yoco-badge">
+        <div class="stitch-badge">
           <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
           </svg>
-          Secured by Yoco · South African payments
+          Secured by Stitch · Card, EFT, Pay by Bank &amp; more
         </div>
 
         <a class="logout-link" id="logout-link">Sign out</a>
@@ -134,7 +134,7 @@
 
   <script src="auth-client.js"></script>
   <script>
-    // Check URL params first (Yoco redirect)
+    // Check URL params first (Stitch redirect)
     const params = new URLSearchParams(window.location.search);
 
     if (params.get('success') === 'true') {
@@ -193,13 +193,13 @@
           throw new Error(data.error || 'Payment setup failed');
         }
 
-        // Redirect to Yoco checkout
+        // Redirect to Stitch hosted payment page
         window.location.href = data.checkoutUrl;
       } catch (err) {
         document.getElementById('loading-overlay').classList.remove('visible');
         alertArea.innerHTML = `<div class="alert alert-error" style="display:block;">${err.message}</div>`;
         btn.disabled = false;
-        btn.innerHTML = `<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg> Subscribe with Yoco · R299/month`;
+        btn.innerHTML = `<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg> Subscribe with Stitch · R299/month`;
       }
     });
 
