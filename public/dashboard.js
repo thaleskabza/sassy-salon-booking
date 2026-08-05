@@ -128,7 +128,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function fetchReport(metric, { from, to }) {
     const params = new URLSearchParams({ metric, from, to });
-    const res = await fetch(`/api/reports?${params}`);
+    const authHeaders = (typeof AuthClient !== 'undefined') ? AuthClient.authHeaders() : {};
+    const res = await fetch(`/api/reports?${params}`, { headers: authHeaders });
     if (!res.ok) {
       console.warn(`Failed to fetch ${metric}`);
       return null;
@@ -139,7 +140,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function fetchKPIs(range = 'month') {
     const { from, to } = getFormattedDateRange(range);
-    const res = await fetch(`/api/kpis?from=${from}&to=${to}`);
+    const authHeaders = (typeof AuthClient !== 'undefined') ? AuthClient.authHeaders() : {};
+    const res = await fetch(`/api/kpis?from=${from}&to=${to}`, { headers: authHeaders });
     if (!res.ok) throw new Error('Failed to fetch KPIs');
     return (await res.json()).data;
   }

@@ -192,21 +192,37 @@ class ToastManager {
   async function apiRequest(url, options = {}) {
     try {
       loading.show();
-      
+
+      // Automatically attach auth token when available
+      const authHeaders = (typeof AuthClient !== 'undefined') ? AuthClient.authHeaders() : {};
+
       const response = await fetch(url, {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders,
           ...options.headers
         }
       });
-  
+
       const data = await response.json();
-  
+
+      // Token expired mid-session
+      if (response.status === 401 && typeof AuthClient !== 'undefined') {
+        AuthClient.logout();
+        return { success: false, error: 'Session expired' };
+      }
+
+      // Subscription lapsed mid-session
+      if (response.status === 402) {
+        window.location.href = '/subscribe.html';
+        return { success: false, error: 'Subscription required' };
+      }
+
       if (!response.ok) {
         throw new Error(data.error || data.message || 'Request failed');
       }
-  
+
       return { success: true, data };
     } catch (error) {
       console.error('API Error:', error);

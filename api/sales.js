@@ -1,8 +1,8 @@
 // api/sales.js
 import redis from './_redis.js';
 import { nanoid } from 'nanoid';
+import { requireAuth, requireSubscription, tk } from './_middleware.js';
 
-// period helper: "2025-11-1" or "2025-11-2"
 function getPeriodFromDate(dateStr) {
   const d = new Date(dateStr);
   const y = d.getFullYear();
@@ -12,7 +12,6 @@ function getPeriodFromDate(dateStr) {
   return `${y}-${m}-${half}`;
 }
 
-// normalise we write to redis (avoid undefined)
 function sanitise(obj) {
   const out = {};
   for (const [k, v] of Object.entries(obj)) {
@@ -23,14 +22,19 @@ function sanitise(obj) {
 }
 
 export default async function handler(req, res) {
-  // ---------------------------------------------------------------------------
-  // CREATE SALE
-  // ---------------------------------------------------------------------------
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+
+  const ok = await requireSubscription(res, auth.tenantId);
+  if (!ok) return;
+
+  const { tenantId } = auth;
+
   if (req.method === 'POST') {
     try {
       const {
-        staff_id,          // client may send this…
-        employee_id,       // …or this
+        staff_id,
+        employee_id,
         sale_date,
         sale_type = 'service',
         amount,
@@ -38,7 +42,7 @@ export default async function handler(req, res) {
         paid_date,
         description = '',
         period,
-        commission_amount,  // optional manual override
+        commission_amount,
       } = req.body;
 
       const finalEmployeeId = employee_id || staff_id;
@@ -50,12 +54,12 @@ export default async function handler(req, res) {
 
       const finalPeriod = period || getPeriodFromDate(sale_date);
       const id = `sale-${nanoid(6)}`;
-      const key = `sale:${id}`;
+      const key = tk(tenantId, `sale:${id}`);
 
       const toWrite = sanitise({
         id,
         employee_id: finalEmployeeId,
-        staff_id: finalEmployeeId, // keep backward compatibility
+        staff_id: finalEmployeeId,
         sale_date,
         sale_type,
         amount: Number(amount),
@@ -67,17 +71,10 @@ export default async function handler(req, res) {
         created_at: new Date().toISOString(),
       });
 
-      // write main record
       await redis.hSet(key, toWrite);
-
-      // global index (THIS is what /api/reports reads)
-      await redis.sAdd('sales:all', key);
-
-      // period index
-      await redis.sAdd(`sales:${finalPeriod}`, key);
-
-      // staff + period index
-      await redis.sAdd(`sales:${finalEmployeeId}:${finalPeriod}`, key);
+      await redis.sAdd(tk(tenantId, 'sales:all'), key);
+      await redis.sAdd(tk(tenantId, `sales:${finalPeriod}`), key);
+      await redis.sAdd(tk(tenantId, `sales:${finalEmployeeId}:${finalPeriod}`), key);
 
       return res.status(201).json({ id, period: finalPeriod });
     } catch (err) {
@@ -86,12 +83,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // LIST SALES
-  // /api/sales?staff_id=...&period=2025-11-1
-  // /api/sales?period=2025-11-1
-  // /api/sales (all)
-  // ---------------------------------------------------------------------------
   if (req.method === 'GET') {
     try {
       const { staff_id, employee_id, period } = req.query;
@@ -100,14 +91,11 @@ export default async function handler(req, res) {
       let keys = [];
 
       if (finalEmployeeId && period) {
-        // specific staff + specific period
-        keys = await redis.sMembers(`sales:${finalEmployeeId}:${period}`);
+        keys = await redis.sMembers(tk(tenantId, `sales:${finalEmployeeId}:${period}`));
       } else if (period) {
-        // all staff for a period
-        keys = await redis.sMembers(`sales:${period}`);
+        keys = await redis.sMembers(tk(tenantId, `sales:${period}`));
       } else {
-        // everything
-        keys = await redis.sMembers('sales:all');
+        keys = await redis.sMembers(tk(tenantId, 'sales:all'));
       }
 
       const sales = await Promise.all(keys.map((k) => redis.hGetAll(k)));
@@ -122,20 +110,10 @@ export default async function handler(req, res) {
           if (isPaid) acc.paid += amt;
           else acc.unpaid += amt;
           acc.count += 1;
-
-          const comm = Number(s.commission_amount || 0);
-          acc.commission_total += comm;
+          acc.commission_total += Number(s.commission_amount || 0);
           return acc;
         },
-        {
-          services: 0,
-          products: 0,
-          total: 0,
-          paid: 0,
-          unpaid: 0,
-          count: 0,
-          commission_total: 0,
-        }
+        { services: 0, products: 0, total: 0, paid: 0, unpaid: 0, count: 0, commission_total: 0 }
       );
 
       return res.status(200).json({ sales, totals });
@@ -145,17 +123,12 @@ export default async function handler(req, res) {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // UPDATE SALE (optional, but nice to have)
-  // PATCH /api/sales?id=sale-xyz
-  // body can contain amount, is_paid, description, commission_amount
-  // ---------------------------------------------------------------------------
   if (req.method === 'PATCH') {
     try {
       const { id } = req.query;
       if (!id) return res.status(400).json({ error: 'id required' });
 
-      const key = `sale:${id}`;
+      const key = tk(tenantId, `sale:${id}`);
       const exists = await redis.exists(key);
       if (!exists) return res.status(404).json({ error: 'Sale not found' });
 
@@ -164,14 +137,11 @@ export default async function handler(req, res) {
         ...(body.amount != null ? { amount: Number(body.amount) } : {}),
         ...(body.is_paid != null ? { is_paid: Boolean(body.is_paid) } : {}),
         ...(body.description != null ? { description: body.description } : {}),
-        ...(body.commission_amount != null
-          ? { commission_amount: Number(body.commission_amount) }
-          : {}),
+        ...(body.commission_amount != null ? { commission_amount: Number(body.commission_amount) } : {}),
         updated_at: new Date().toISOString(),
       });
 
       await redis.hSet(key, patch);
-
       const fresh = await redis.hGetAll(key);
       return res.status(200).json(fresh);
     } catch (err) {

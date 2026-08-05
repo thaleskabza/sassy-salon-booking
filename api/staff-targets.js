@@ -1,8 +1,17 @@
 // api/staff-targets.js
 import redis from './_redis.js';
 import { nanoid } from 'nanoid';
+import { requireAuth, requireSubscription, tk } from './_middleware.js';
 
 export default async function handler(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+
+  const ok = await requireSubscription(res, auth.tenantId);
+  if (!ok) return;
+
+  const { tenantId } = auth;
+
   if (req.method === 'POST') {
     try {
       const {
@@ -20,7 +29,7 @@ export default async function handler(req, res) {
       }
 
       const id = `starget-${nanoid(6)}`;
-      const key = `staff-target:${finalId}:${week_start}`;
+      const key = tk(tenantId, `staff-target:${finalId}:${week_start}`);
 
       await redis.hSet(key, {
         id,
@@ -32,7 +41,7 @@ export default async function handler(req, res) {
         created_at: new Date().toISOString()
       });
 
-      await redis.sAdd(`staff-targets:${finalId}`, key);
+      await redis.sAdd(tk(tenantId, `staff-targets:${finalId}`), key);
 
       return res.status(201).json({ message: 'saved' });
     } catch (err) {
@@ -47,7 +56,7 @@ export default async function handler(req, res) {
       const finalId = employee_id || staff_id;
       if (!finalId) return res.status(400).json({ error: 'staff_id/employee_id required' });
 
-      const keys = await redis.sMembers(`staff-targets:${finalId}`);
+      const keys = await redis.sMembers(tk(tenantId, `staff-targets:${finalId}`));
       const all = await Promise.all(keys.map((k) => redis.hGetAll(k)));
 
       return res.status(200).json({ targets: all });
